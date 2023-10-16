@@ -38,9 +38,9 @@ struct timing
 	int next;
 };
 
-#include "arch.h"
-#include "network.h"
-#include "stdio.h"
+#include "arch.hpp"
+#include "network.hpp"
+#include <stdio.h>
 
 struct timestep sim_timestep(struct simulation *const sim, struct network *const net, struct architecture *const arch);
 void sim_init_sim(struct simulation *sim);

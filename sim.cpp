@@ -9,10 +9,10 @@
 #include <math.h>
 #include <omp.h>
 
-#include "print.h"
-#include "sim.h"
-#include "network.h"
-#include "arch.h"
+#include "print.hpp"
+#include "sim.hpp"
+#include "network.hpp"
+#include "arch.hpp"
 
 struct timestep sim_timestep(struct simulation *const sim,
 	struct network *const net, struct architecture *const arch)

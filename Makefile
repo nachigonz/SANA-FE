@@ -1,6 +1,6 @@
 #CC=clang-3.8
-CC=gcc
-CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -fopenmp
+CC=g++
+CPPFLAGS=--std=c++11 -Wall -pedantic -Werror -g -fopenmp
 #CFLAGS=--std=gnu99 -Wall -pedantic -Werror -g -pg -fopenmp
 #RELFLAGS=-Ofast
 RELFLATS=-O0
@@ -8,7 +8,7 @@ DEBUGFLAGS=-DDEBUG -no-pie -pg -O0
 GIT_COMMIT=$(shell ./scripts/git_status.sh)
 
 LIBS=-lrt -lm
-DEPS=sim.h print.h command.h network.h arch.h description.h
+DEPS=sim.hpp print.hpp command.hpp network.hpp arch.hpp description.hpp
 OBJ=main.o sim.o command.o network.o arch.o description.o
 DEBUGDIR=debug
 RELDIR=release
@@ -29,17 +29,17 @@ release: $(RELEXE)
 
 debug: prep $(DEBUGEXE)
 
-$(RELDIR)/%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) $(RELFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+$(RELDIR)/%.o: %.cpp $(DEPS)
+	$(CXX) -c -o $@ $< $(CPPFLAGS) $(RELFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 $(RELEXE): $(RELOBJ)
-	$(CC) -o $@ $^ $(CFLAGS) $(RELFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(CPPFLAGS) $(RELFLAGS) $(LIBS)
 
-$(DEBUGDIR)/%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) $(DEBUGFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
+$(DEBUGDIR)/%.o: %.cpp $(DEPS)
+	$(CXX) -c -o $@ $< $(CPPFLAGS) $(DEBUGFLAGS) -DGIT_COMMIT=\"$(GIT_COMMIT)\"
 
 $(DEBUGEXE): $(DEBUGOBJ)
-	$(CC) -o $@ $^ $(CFLAGS) $(DEBUGFLAG) $(LIBS)
+	$(CXX) -o $@ $^ $(CPPFLAGS) $(DEBUGFLAG) $(LIBS)
 
 clean:
 	rm -f $(RELEXE)
