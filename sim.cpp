@@ -796,7 +796,8 @@ double sim_generate_noise(struct core *c)
 		//  random values. This is useful if we want to exactly
 		//  replicate h/w without knowing how the stream is generated.
 		//  We can record the random sequence and replicate it here
-		char noise_str[MAX_NOISE_FILE_ENTRY];
+		// char noise_str[MAX_NOISE_FILE_ENTRY];
+		char* noise_str;
 		// If we get to the end of the stream, by default reset it.
 		//  However, it is unlikely the stream will be correct at this
 		//  point
@@ -806,7 +807,7 @@ double sim_generate_noise(struct core *c)
 			     "Random values are unlikely to be correct.\n");
 			fseek(c->noise_stream, 0, SEEK_SET);
 		}
-		fgets(noise_str, MAX_NOISE_FILE_ENTRY, c->noise_stream);
+		noise_str = fgets(noise_str, MAX_NOISE_FILE_ENTRY, c->noise_stream);
 		ret = sscanf(noise_str, "%d", &noise_val);
 		TRACE2("noise val:%d\n", noise_val);
 		if (ret < 1)
