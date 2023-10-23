@@ -10,7 +10,6 @@ import matplotlib
 matplotlib.use('Agg')
 
 import csv
-import subprocess
 from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
@@ -28,18 +27,20 @@ ARCH_FILENAME = "arch/loihi_latin.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
+LOIHI_COMPARTMENTS = 1024
 TIMESTEPS = 10240
 
-def calculate_graph_index(row, col, digit):
+def calculate_graph_index(N, row, col, digit):
     return ((row*N + col)*N) + digit
 
-def latin_square():
+def latin_square(N, tiles=LOIHI_TILES, cores_per_tile=LOIHI_CORES_PER_TILE,
+                 neurons_per_core=LOIHI_COMPARTMENTS):
     network = sim.Network(save_mappings=True)
-    compartments = sim.init_compartments(LOIHI_TILES, LOIHI_CORES_PER_TILE,
-                                            1024)
+    compartments = sim.init_compartments(tiles, cores_per_tile,
+                                         neurons_per_core)
     print(f"Creating WTA networks for {N} digits")
-    G = nx.DiGraph()
-    G.add_nodes_from(range(0, N**3))
+    #G = nx.DiGraph()
+    #G.add_nodes_from(range(0, N**3))
 
     # For every position in the square, create a WTA layer representing all
     #  possible digit choices
@@ -47,13 +48,18 @@ def latin_square():
     for i in range(0, N):
         row = []
         for j in range(0, N):
-            row.append(sim.create_layer(network, N, compartments,
-                                        log_spikes=1,
-                                        log_potential=1,
-                                        force_update=0,
-                                        threshold=1.0 * (2**6),
-                                        reset=0.0,
-                                        leak=1.0))
+            wta = sim.create_layer(network, N, compartments,
+                                   log_spikes=False,
+                                   log_potential=False,
+                                   force_update=False,
+                                   threshold=64.0,
+                                   reset=0.0,
+                                   leak=1,
+                                   reverse_threshold=-2**7 + 1.0,
+                                   reverse_reset_mode="saturate")
+            for neuron in wta.neurons:
+                neuron.add_bias(1 * 2**7)
+            row.append(wta)
         square.append(row)
 
     # Connect such that every digit in one position inhibits all other digits in
@@ -70,9 +76,9 @@ def latin_square():
                         #  position
                         post_neuron = pos.neurons[d]
                         pre_neuron.add_connection(post_neuron, -1)
-                        i = calculate_graph_index(row, col, digit)
-                        j = calculate_graph_index(row, col, d)
-                        G.add_edge(i, j, weights=-1)
+                        i = calculate_graph_index(N, row, col, digit)
+                        j = calculate_graph_index(N, row, col, d)
+                        # G.add_edge(i, j, weights=-1)
                         connections += 1
 
                 for r in range(0, N):
@@ -82,8 +88,8 @@ def latin_square():
                         dest = square[r][col]
                         post_neuron = dest.neurons[digit]
                         pre_neuron.add_connection(post_neuron, -1)
-                        j = calculate_graph_index(r, col, digit)
-                        G.add_edge(i, j, weights=-1)
+                        j = calculate_graph_index(N, r, col, digit)
+                        # G.add_edge(i, j, weights=-1)
                         connections += 1
 
                 for c in range(0, N):
@@ -92,15 +98,17 @@ def latin_square():
                         dest = square[row][c]
                         post_neuron = dest.neurons[digit]
                         pre_neuron.add_connection(post_neuron, -1)
-                        j = calculate_graph_index(row, c, digit)
-                        G.add_edge(i, j, weights=-1)
+                        j = calculate_graph_index(N, row, c, digit)
+                        # G.add_edge(i, j, weights=-1)
                         connections += 1
 
     print(f"Latin square network has {connections} connections")
-    network_path = os.path.join(PROJECT_DIR, NETWORK_FILENAME)
+    network_filename = os.path.join("runs", "dse", f"latin_square_N{N}.net")
+    network_path = os.path.join(PROJECT_DIR, network_filename)
     network.save(network_path)
 
-def plot_results():
+
+def plot_results(N, network_path):
     if N < 4:
         pos = nx.nx_agraph.graphviz_layout(G)
         nx.draw_networkx(G, pos)
@@ -161,16 +169,16 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiment = False
+    run_experiments = False
     plot_experiment = True
 
-    if run_experiment:
+    if run_experiments:
         if (os.path.isfile(os.path.join(PROJECT_DIR, "runs", "latin",
                            "loihi_latin.csv"))):
             open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
                  "w")
-            with (open(os.path.join(PROJECT_DIR, "runs", "latin",
-                                    "loihi_latin.csv")) as latin_squares_file):
+            with open(os.path.join(PROJECT_DIR, "runs", "latin",
+                                    "loihi_latin.csv")) as latin_squares_file:
                 reader = csv.DictReader(latin_squares_file)
 
                 for line in reader:
@@ -198,7 +206,7 @@ if __name__ == "__main__":
         loihi_latency = df["loihi_latency"].values * 1.0e6
 
         # Plot the simulated vs measured energy
-        plt.rcParams.update({"font.size": 8, "lines.markersize": 5})
+        plt.rcParams.update({"font.size": 7, "lines.markersize": 5})
         plt.figure(figsize=(1.7, 1.7))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
@@ -229,7 +237,7 @@ if __name__ == "__main__":
         plt.ylabel("Measured Latency ($\mu$s)")
         plt.xticks(np.arange(0, 41, 20))
         plt.yticks(np.arange(0, 41, 20))
-        plt.tight_layout()
+        plt.tight_layout(pad=0.3)
 
         plt.savefig(os.path.join(PROJECT_DIR, "runs", "latin",
                                  "latin_latency.pdf"))
