@@ -17,8 +17,6 @@ add_compile_options(
 file (GLOB SOURCE_FILES "*.cpp")
 file (GLOB HEADER_FILES "*.hpp")
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES} ${HEADER_FILES})
-
 # Get the latest commit hash
 execute_process(
     COMMAND git rev-parse HEAD
@@ -39,17 +37,17 @@ if(NOT pybind11_POPULATED)
     FetchContent_Populate(pybind11)
     add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
 endif()
+find_package(pybind11 REQUIRED)
 pybind11_add_module(simcpp 
-	${SOURCE_FILES}
-	${HEADER_FILES}
+	main.cpp sim.cpp
 )
+target_link_libraries(simcpp PUBLIC)
 
 find_package(OpenMP REQUIRED)
 
 add_executable(sim main.cpp)
 target_sources(sim
     PRIVATE ${SOURCE_FILES}
-	PRIVATE ${HEADER_FILES}
 )
 
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)

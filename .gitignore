@@ -4,6 +4,7 @@ release/
 etc/
 CMakeFiles/
 _deps/
+build/
 *.swp
 *.yaml
 *.png

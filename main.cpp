@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+// #include <pybind11/pybind11.h>
 
 #include "print.hpp"
 #include "sim.hpp"
@@ -318,4 +319,18 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	}
 
 	return ts_elapsed;
+}
+
+namespace py = pybind11;
+
+void init_python(py::module &);
+
+namespace simpy {
+
+PYBIND11_MODULE(simcpp, m) {
+    // Optional docstring
+    m.doc() = "Python/C++ Interface";
+    
+    init_python(m);
+}
 }
