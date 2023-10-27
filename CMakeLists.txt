@@ -11,7 +11,7 @@ endif()
 project(SANA-FE)
 
 add_compile_options(
-    -Wall -pedantic -Werror -g -fopenmp
+    -ldl -Wall -pedantic -Werror -g -fopenmp
 )
 
 file (GLOB SOURCE_FILES "*.cpp")
@@ -51,3 +51,4 @@ target_sources(sim
 )
 
 target_link_libraries(sim PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(sim PRIVATE ${CMAKE_DL_LIBS})

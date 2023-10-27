@@ -321,16 +321,16 @@ struct timespec calculate_elapsed_time(struct timespec ts_start,
 	return ts_elapsed;
 }
 
-namespace py = pybind11;
+// namespace py = pybind11;
 
-void init_python(py::module &);
+// void init_python(py::module &);
 
-namespace simpy {
+// namespace simpy {
 
-PYBIND11_MODULE(simcpp, m) {
-    // Optional docstring
-    m.doc() = "Python/C++ Interface";
+// PYBIND11_MODULE(simcpp, m) {
+//     // Optional docstring
+//     m.doc() = "Python/C++ Interface";
     
-    init_python(m);
-}
-}
+//     init_python(m);
+// }
+// }

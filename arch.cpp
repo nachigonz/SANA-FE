@@ -11,10 +11,13 @@
 #include "arch.hpp"
 #include "network.hpp"
 #include "description.hpp"
+#include "plugins.hpp"
 
 struct architecture *arch_init(void)
 {
 	struct architecture *arch;
+
+	init_soma();
 
 	arch = (struct architecture *) malloc(sizeof(struct architecture));
 	if (arch == NULL)

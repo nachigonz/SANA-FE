@@ -274,6 +274,33 @@ network.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/network.cpp.s
 .PHONY : network.cpp.s
 
+plugins.o: plugins.cpp.o
+
+.PHONY : plugins.o
+
+# target to build an object file
+plugins.cpp.o:
+	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/plugins.cpp.o
+.PHONY : plugins.cpp.o
+
+plugins.i: plugins.cpp.i
+
+.PHONY : plugins.i
+
+# target to preprocess a source file
+plugins.cpp.i:
+	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/plugins.cpp.i
+.PHONY : plugins.cpp.i
+
+plugins.s: plugins.cpp.s
+
+.PHONY : plugins.s
+
+# target to generate assembly for a file
+plugins.cpp.s:
+	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/plugins.cpp.s
+.PHONY : plugins.cpp.s
+
 sim.o: sim.cpp.o
 
 .PHONY : sim.o
@@ -329,6 +356,9 @@ help:
 	@echo "... network.o"
 	@echo "... network.i"
 	@echo "... network.s"
+	@echo "... plugins.o"
+	@echo "... plugins.i"
+	@echo "... plugins.s"
 	@echo "... sim.o"
 	@echo "... sim.i"
 	@echo "... sim.s"
