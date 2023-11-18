@@ -447,7 +447,7 @@ def create_dendrite(tile_id, core_id, dendrite_dict):
 
 
 def create_soma(tile_id, core_id, soma_dict):
-    soma = (f"+ {tile_id} {core_id}" + format_attributes(soma_dict["attributes"]))
+    soma = (f"+ {tile_id} {core_id}" + f" name={soma_dict['name']}" + format_attributes(soma_dict["attributes"]))
     _entry_list.append(soma)
     return
 

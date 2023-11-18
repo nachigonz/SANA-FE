@@ -22,6 +22,7 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 #include <string.h>
 #include "network.hpp"
 #include "description.hpp"
+#include "plugins.hpp"
 
 // Hard define maximum defined h/w sizes
 #define ARCH_MAX_COMPARTMENTS 16384
@@ -138,6 +139,7 @@ struct dendrite_processor
 struct soma_processor
 {
 	char name[MAX_FIELD_LEN];
+	Base_Soma* soma_class;
 	int model, leak_towards_zero, reset_mode, reverse_reset_mode;
 	long int updates, spikes_sent;
 	double energy, time;

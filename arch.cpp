@@ -17,8 +17,6 @@ struct architecture *arch_init(void)
 {
 	struct architecture *arch;
 
-	init_soma();
-
 	arch = (struct architecture *) malloc(sizeof(struct architecture));
 	if (arch == NULL)
 	{
@@ -546,7 +544,15 @@ void arch_create_soma(struct core *const c, struct attributes *attr,
 		{
 			sscanf(a->value_str, "%lf", &s->time_spiking);
 		}
+		else if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
+		{
+			sscanf(a->value_str, "%s", s->name);
+		}
 	}
+
+	// Create soma class
+	s->soma_class = get_soma(s->name);
+	// INFO("Result of first call %d", s->soma_class->update_soma(1.0));
 
 	TRACE1("Soma processor created (c:%d.%d)\n", c->t->id, c->id);
 	return;
@@ -819,6 +825,10 @@ int arch_parse_neuron_model(char *model_str)
 	else if (strcmp(model_str, "truenorth") == 0)
 	{
 		model = NEURON_TRUENORTH;
+	}
+	else if (strcmp(model_str, "base_test") == 0)
+	{
+		model = 2;
 	}
 	else
 	{

@@ -752,6 +752,42 @@ double sim_update_dendrite(
 	return latency;
 }
 
+double sim_update_soma_base(struct timestep *const ts, struct neuron *n, const double current_in){
+	struct soma_processor *soma = n->soma_hw;
+	double latency = 0.0;
+
+	// Calculate the change in potential since the last update e.g.
+	//  integate inputs and apply any potential leak
+	TRACE1("Updating potential\n");
+
+	// Check against threshold potential (for spiking)
+	bool res = soma->soma_class->update_soma(current_in);
+	if (res)
+	{
+		if (n->group->reset_mode == NEURON_RESET_HARD)
+		{
+			n->potential = n->reset;
+		}
+		else if (n->group->reset_mode == NEURON_RESET_SOFT)
+		{
+			n->potential -= n->threshold;
+		}
+		latency += sim_neuron_send_spike(n);
+		soma->spikes_sent++;
+	}
+
+	// Update soma, if there are any received spikes, there is a non-zero
+	//  bias or we force the neuron to update every time-step
+	if (n->spike_count || (fabs(n->bias) > 0.0) || n->force_update)
+	{
+		latency += n->soma_hw->time_active_neuron_update;
+		soma->updates++;
+		n->soma_hw->energy += n->soma_hw->energy_active_neuron_update;
+	}
+
+	return latency;
+}
+
 double sim_update_soma(
 	struct timestep *const ts, struct neuron *n, const double current_in)
 {
@@ -775,6 +811,10 @@ double sim_update_soma(
 	else if (soma->model == NEURON_TRUENORTH)
 	{
 		latency += sim_update_soma_truenorth(ts, n, current_in);
+	}
+	else if (soma->model == 2)
+	{
+		latency += sim_update_soma_base(ts, n, current_in);
 	}
 	else
 	{
