@@ -32,19 +32,36 @@ struct timestep sim_timestep(struct simulation *const sim,
 	// Performance statistics for this time step
 	ts.sim_time = sim_calculate_time(arch);
 	ts.energy = sim_calculate_energy(arch);
+	for (int i = 0; i < arch->tile_count; i++)
+	{
+		struct tile *t = &(arch->tiles[i]);
+		for (int j = 0; j < t->core_count; j++)
+		{
+			struct core *c = &(t->cores[j]);
 
-	sim->timesteps++;
-	sim->total_sim_time += ts.sim_time;
-	sim->total_energy += ts.energy;
-	sim->total_spikes += ts.spikes;
-	sim->total_messages_sent += ts.messages_sent;
-	sim->total_neurons_fired += ts.total_neurons_fired;
-
-	TRACE1("Spikes sent: %ld\n", sim->total_spikes);
+			for (int k = 0; k < ARCH_MAX_UNITS; k++)
+			{
+				ts.spike_count +=
+					c->synapse[k].spikes_processed;
+				ts.total_neurons_fired +=
+					c->soma[k].neurons_fired;
+			}
+		}
+		ts.messages_sent += t->messages_received;
+	}
 	if (sim->perf_fp)
 	{
 		sim_perf_log_timestep(&ts, sim->perf_fp);
 	}
+
+	sim->timesteps++;
+	sim->total_energy += ts.energy;
+	sim->total_sim_time += ts.sim_time;
+	sim->total_spikes += ts.spike_count;
+	sim->total_neurons_fired += ts.total_neurons_fired;
+	sim->total_messages_sent += ts.messages_sent;
+
+	TRACE1("Spikes sent: %ld\n", sim->total_spikes);
 	return ts;
 }
 
@@ -138,7 +155,7 @@ void sim_receive_messages(struct timestep *const ts, struct architecture *arch)
 					assert(pre_tile != NULL);
 					axon->network_latency =
 						sim_estimate_network_costs(
-							ts, pre_tile, t);
+							pre_tile, t);
 					axon->receive_latency =
 						sim_pipeline_receive(
 							ts, c, axon);
@@ -148,8 +165,8 @@ void sim_receive_messages(struct timestep *const ts, struct architecture *arch)
 	}
 }
 
-double sim_estimate_network_costs(struct timestep *const ts,
-	struct tile *const src, struct tile *const dest)
+double sim_estimate_network_costs(struct tile *const src,
+	struct tile *const dest)
 {
 	double network_latency;
 	long int x_hops, y_hops;
@@ -157,23 +174,40 @@ double sim_estimate_network_costs(struct timestep *const ts,
 	assert(src != NULL);
 	assert(dest != NULL);
 
-	src->energy += src->energy_spike_within_tile;
 	network_latency = src->time_spike_within_tile;
 
 	// Calculate the energy and time for sending spike packets
 	x_hops = abs(src->x - dest->x);
 	y_hops = abs(src->y - dest->y);
 	// E-W hops
-	src->energy += (double) x_hops * src->energy_east_west_hop;
-	network_latency += (double) x_hops * src->time_east_west_hop;
-	// N-S hops
-	src->energy += (double) y_hops * src->energy_north_south_hop;
-	network_latency += (double) y_hops * src->time_north_south_hop;
 
-	ts->total_hops += (x_hops + y_hops);
-	ts->messages_sent++;
+	if (src->x < dest->x)
+	{
+		dest->east_hops += x_hops;
+		network_latency += (double) x_hops * src->latency_east_hop;
+	}
+	else
+	{
+		dest->west_hops += x_hops;
+		network_latency += (double) x_hops * src->latency_west_hop;
+	}
+
+	// N-S hops
+	if (src->y < dest->y)
+	{
+		dest->north_hops += y_hops;
+		network_latency += (double) y_hops * src->latency_north_hop;
+	}
+	else
+	{
+		dest->south_hops += y_hops;
+		network_latency += (double) y_hops * src->latency_south_hop;
+	}
+
+	dest->hops += (x_hops + y_hops);
+	dest->messages_received++;
 	TRACE1("xhops:%ld yhops%ld total hops:%ld latency:%e\n", x_hops, y_hops,
-		ts->total_hops, network_latency);
+		t->hops, network_latency);
 	return network_latency;
 }
 
@@ -189,198 +223,217 @@ void sim_init_message(struct message *const m)
 	m->receive_latency = 0.0;
 }
 
+struct message *sim_get_next_message(struct core *c)
+{
+	struct message *m;
+	double neuron_processing_latency;
+
+	// Get the next message
+	if (c->messages_left == 0)
+	{
+		struct neuron *src_neuron;
+
+		neuron_processing_latency = 0.0;
+		while (c->neurons_left > 0)
+		{
+			assert(c->curr_neuron < c->neuron_count);
+			src_neuron = c->neurons[c->curr_neuron];
+			assert(src_neuron != NULL);
+
+			neuron_processing_latency +=
+				src_neuron->processing_latency;
+			if (!(src_neuron->is_init) || !(src_neuron->fired) ||
+				(src_neuron->maps_out_count == 0))
+			{
+				// Neuron isn't initialized, didn't fire or
+				//  has no outgoing connections, so skip it.
+				//  This neuron can't generate any messages.
+				c->curr_neuron++;
+				//INFO("\t curr_neuron:%d neuron_processing_latency:%e\n", c->curr_neuron, neuron_processing_latency);
+				c->neurons_left--;
+				c->curr_axon = 0;
+			}
+			else if (src_neuron->fired)
+			{
+				TRACE2("(cid:%d.%d) nid:%d.%d fired, "
+					"time:%e\n",
+					c->t->id, c->id,
+					src_neuron->group->id,
+					src_neuron->id, c->time);
+				c->messages_left = src_neuron->maps_out_count;
+				c->curr_axon = 0;
+				break;
+			}
+		}
+	}
+	else
+	{
+		neuron_processing_latency = 0.0;
+	}
+
+	if (c->messages_left > 0)
+	{
+		m = &(c->curr_message);
+		sim_init_message(m);
+
+		m->src_neuron = c->neurons[c->curr_neuron];
+		m->dest_axon = m->src_neuron->maps_out[c->curr_axon];
+		m->spikes = m->dest_axon->connection_count;
+		m->src_core = c;
+		m->src_tile = c->t;
+		m->dest_neuron = m->dest_axon->connections[0]->post_neuron;
+		m->dest_core = m->dest_neuron->core;
+		m->dest_tile = m->dest_core->t;
+
+		// Add axon access cost to message latency and energy
+		m->generation_latency = neuron_processing_latency +
+			c->axon_out.time_access;
+		m->network_latency = m->dest_axon->network_latency;
+		m->receive_latency = m->dest_axon->receive_latency;
+		c->axon_out.packets_out++;
+
+		assert(m->src_neuron->maps_out != NULL);
+		assert(m->src_neuron->maps_out[0] != NULL);
+		assert(m->dest_axon != NULL);
+		assert(m->dest_axon->connections != NULL);
+		assert(m->dest_axon->spikes_received > 0);
+		assert(m->src_tile != NULL);
+		assert(m->dest_core != NULL);
+		assert(m->dest_tile != NULL);
+
+		c->curr_axon++;
+		c->messages_left--;
+		if (c->messages_left == 0)
+		{
+			// If we processed the last message for this neuron,
+			//  go to the next neuron
+			c->curr_neuron++;
+			c->neurons_left--;
+			c->curr_axon = 0;
+		}
+	}
+	else
+	{
+		assert(c->neurons_left == 0);
+		// No messages left to process, but track any additional core
+		//  processing time after the last message. Assume we've
+		//  accounted for all mapped neurons
+		m = NULL;
+		c->latency_after_last_message = neuron_processing_latency;
+	}
+
+	return m;
+}
+
 int sim_schedule_messages(const struct simulation *const sim,
 	struct timestep *const ts, struct architecture *const arch)
 {
-	struct core *top_priority;
-	const int core_count = ARCH_MAX_CORES * ARCH_MAX_TILES;
-	int cores_left;
-
-	top_priority = sim_init_timing_priority(arch);
+	struct core *priority_queue;
+	priority_queue = sim_init_timing_priority(arch, ts);
 
 	// Setup timing counters
 	TRACE1("Scheduling global order of messages.\n");
-	cores_left = core_count;
+
+	// While queue isn't empty
+	while (priority_queue != NULL)
+	{
+		// Get the core with the earliest simulation time
+		struct core *c = sim_pop_priority_queue(&priority_queue);
+		struct message *m = &(c->curr_message);
+
+		assert(m->dest_core != NULL);
+		assert(m->dest_tile != NULL);
+		if (m->dest_tile->is_blocking)
+		{
+			m->blocked_latency = fmax(m->blocked_latency,
+				m->dest_tile->blocked_until - c->time);
+			// Update the core global time, blocking until
+			//  the receiving tile is free
+			c->time = fmax(c->time, m->dest_tile->blocked_until);
+		}
+		if (m->dest_core->is_blocking)
+		{
+			// Track how long the message is blocked for
+			m->blocked_latency = fmax(m->blocked_latency,
+				m->dest_core->blocked_until - c->time);
+			// Update the core global time, blocking until
+			//  the receiving core is free
+			c->time = fmax(c->time, m->dest_core->blocked_until);
+
+			// Calculate when the receiving h/w will be busy
+			//  until
+			if (c->time < m->dest_core->blocked_until)
+			{
+				// If we were trying to send a spike to
+				//  a blocked core, also block the tile
+				//  for this duration as well
+				m->dest_tile->blocked_until =
+					m->dest_core->blocked_until;
+				// Update the core global time, blocking
+				//  until the receiving core is free
+				c->time = m->dest_core->blocked_until;
+			}
+		}
+
+		// Set time-stamps, calculating when the receiving H/W will be
+		//  busy until
+		c->time += m->network_latency;
+		// TODO: for some reason this seems quite important for DVS
+		//  gesture accuracy. The core is busy until the message is
+		//  delivered by the network
+
+		m->dest_core->blocked_until = fmax(
+			(m->dest_core->blocked_until + m->network_latency +
+			m->receive_latency),
+			(c->time + m->receive_latency));
+
+		TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
+			c->t->id, c->id, m->dest_core->t->id,
+			m->dest_core->id, m->dest_core->blocked_until);
+
+		TRACE2("cid:%d axon:%d (%d messages left)\n", c->id,
+			c->curr_axon, c->messages_left);
+		if (sim->log_messages)
+		{
+			sim_trace_record_message(sim, m);
+		}
+
+		// Get the next message, neuron or core
+		m = sim_get_next_message(c);
+		// Regardless of whether we are sending a message, add the
+		//  processing time
+		if (m != NULL)
+		{
+			c->time += m->generation_latency;
+			sim_insert_priority_queue(&priority_queue, c);
+		}
+		else
+		{
+			TRACE2("\t(cid:%d.%d) finished simulating\n", c->t->id,
+				c->id);
+		}
+
+		if (priority_queue != NULL)
+		{
+			TRACE2("\t(cid:%d.%d) time:%e\n",
+				(*priority_queue)->t->id,
+				(*priority_queue)->id, (*priority_queue)->time);
+		}
+	}
+	TRACE1("Neurons fired: %ld\n", ts->total_neurons_fired);
+
+	// Add the processing time of neurons after sending the last message
+	//INFO("** Final times **\n");
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
-			c->neurons_left = c->neuron_count;
-			c->curr_neuron = 0;
-			c->messages_left = 0;
-			c->curr_axon = 0;
+			//INFO("c->time:%e, c->latency_after_last_message:%e\n", c->time, c->latency_after_last_message);
+			c->time += c->latency_after_last_message;
 		}
 	}
-
-	while (cores_left && (top_priority != NULL))
-	{
-		// Get the core with the earliest simulation time
-		struct message m;
-		struct core *c = top_priority;
-
-		// If all messages were processed, get the next spiking neuron
-		//  and see how many spike messages to send
-		sim_init_message(&m);
-		if (c->messages_left <= 0)
-		{
-			// Get the next spiking neuron that sends one or more
-			//  spike messages
-			TRACE2("Getting next firing neuron for cid:%d\n",
-				c->id);
-			while (c->neurons_left > 0)
-			{
-				int nid = c->curr_neuron;
-				assert(nid < c->neuron_count);
-				m.src_neuron = c->neurons[nid];
-				assert(m.src_neuron != NULL);
-
-				c->time += m.src_neuron->processing_latency;
-				m.generation_latency +=
-					m.src_neuron->processing_latency;
-				if (!(m.src_neuron->is_init) ||
-					!(m.src_neuron->fired))
-				{
-					c->curr_neuron++;
-					c->neurons_left--;
-					c->curr_axon = 0;
-				}
-				else if (m.src_neuron->fired)
-				{
-					TRACE2("(cid:%d.%d) nid:%d.%d fired, "
-					       "time:%e\n",
-						c->t->id, c->id,
-						m.src_neuron->group->id,
-						m.src_neuron->id, c->time);
-					ts->total_neurons_fired++;
-					c->messages_left =
-						m.src_neuron->maps_out_count;
-					c->curr_axon = 0;
-
-					break;
-				}
-			}
-		}
-		else
-		{
-			// Schedule this neuron's messages
-			struct neuron *n;
-			int nid = c->curr_neuron;
-
-			m.src_neuron = c->neurons[nid];
-			assert(m.src_neuron->maps_out != NULL);
-			assert(m.src_neuron->maps_out[0] != NULL);
-
-			m.dest_axon = m.src_neuron->maps_out[c->curr_axon];
-			assert(m.dest_axon != NULL);
-			assert(m.dest_axon->connections != NULL);
-			assert(m.dest_axon->spikes_received > 0);
-			m.spikes = m.dest_axon->connection_count;
-			m.src_core = c;
-			m.src_tile = c->t;
-			assert(m.src_tile != NULL);
-
-			n = m.dest_axon->connections[0]->post_neuron;
-			m.receive_latency = m.dest_axon->receive_latency;
-			m.network_latency = m.dest_axon->network_latency;
-			m.dest_core = n->core;
-			m.dest_tile = m.dest_core->t;
-			assert(m.dest_tile != NULL);
-			m.hops = abs(m.src_tile->x - m.dest_tile->x);
-			m.hops += abs(m.src_tile->y - m.dest_tile->y);
-			TRACE1("\t(cid:%d.%d) Sending %d spikes to %d.%d\n",
-				c->t->id, c->id, m.dest_axon->connection_count,
-				m.dest_core->t->id, m.dest_core->id);
-			TRACE1("cid:%d: %d messages left\n", c->id,
-				c->messages_left);
-
-			// Add axon access cost to message latency and energy
-			c->time += c->axon_out.time_access;
-			m.generation_latency += c->axon_out.time_access;
-			c->axon_out.energy += c->axon_out.energy_access;
-
-			// Account for core hardware interactions, blocking the
-			//  message from being scheduled if the receiving h/w
-			//  is busy
-			m.blocked_latency = 0.0;
-			if (m.dest_core->is_blocking)
-			{
-				// Track how long the message is blocked for
-				m.blocked_latency = fmax(m.blocked_latency,
-					m.dest_core->blocked_until - c->time);
-				// Update the core global time, blocking until
-				//  the receiving core is free
-				c->time = fmax(
-					c->time, m.dest_core->blocked_until);
-			}
-			if (m.dest_tile->is_blocking)
-			{
-				m.blocked_latency = fmax(m.blocked_latency,
-					m.dest_core->blocked_until - c->time);
-				// Update the core global time, blocking until
-				//  the receiving tile is free
-				c->time = fmax(
-					c->time, m.dest_tile->blocked_until);
-			}
-
-			// Calculate when the receiving h/w will be busy until
-			m.dest_tile->blocked_until =
-				c->time + m.dest_axon->network_latency;
-
-			c->time += m.dest_axon->network_latency;
-			if (m.dest_core->is_blocking)
-			{
-				m.dest_core->blocked_until =
-					c->time + m.receive_latency;
-			}
-			else
-			{
-				m.dest_core->blocked_until += m.receive_latency;
-			}
-			TRACE2("\t(cid:%d.%d) synapse at %d.%d busy until %e\n",
-				c->t->id, c->id, m.dest_core->t->id,
-				m.dest_core->id, m.dest_core->blocked_until);
-
-			// Get the next message
-			c->curr_axon++;
-			c->messages_left--;
-			TRACE2("cid:%d axon:%d (%d messages left)\n", c->id,
-				c->curr_axon, c->messages_left);
-			if (sim->log_messages)
-			{
-				sim_trace_record_message(sim, &m);
-			}
-			sim_init_message(&m);
-		}
-
-		// Get the next message, neuron or core
-		if (c->neurons_left && c->messages_left <= 0)
-		{
-			// We just scheduled the last message, get the next
-			//  neuron to process
-			c->curr_neuron++;
-			c->neurons_left--;
-		}
-		if (c->neurons_left <= 0)
-		{
-			TRACE1("\t(cid:%d.%d) finished simulating\n", c->t->id,
-				c->id);
-			// The last neuron's messages are all scheduled, so
-			//  remove the core from the priority queue
-			cores_left--;
-			assert(cores_left >= 0);
-			top_priority = top_priority->next_timing;
-		}
-
-		top_priority = sim_update_timing_queue(top_priority);
-		if (top_priority != NULL)
-		{
-			TRACE2("\t(cid:%d.%d) time:%e\n", top_priority->t->id,
-				top_priority->id, top_priority->time);
-		}
-	}
-	TRACE1("Neurons fired: %ld\n", ts->total_neurons_fired);
 
 	return 0;
 }
@@ -456,57 +509,86 @@ double sim_pipeline_receive(
 	return message_processing_latency;
 }
 
-struct core *sim_init_timing_priority(struct architecture *arch)
+struct core *sim_init_timing_priority(struct architecture *arch, struct timestep *ts)
 {
-	struct core *next = NULL;
+	struct core *priority_queue;
+	priority_queue = NULL;
 
-	// Initialize in reverse order, but assuming all cores start time
-	//  synchronized (time ==), this is arbitrary
-	for (int i = (arch->tile_count - 1); i >= 0; i--)
+	//INFO("Initializing priority queue.\n");
+	for (int i = 0; i < arch->tile_count; i++)
 	{
 		struct tile *t = &(arch->tiles[i]);
-		for (int j = (t->core_count - 1); j >= 0; j--)
+		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
-			assert(c->time == 0.0);
-			if (c->neuron_count > 0)
+			c->neurons_left = c->neuron_count;
+			c->curr_neuron = 0;
+			c->messages_left = 0;
+			c->curr_axon = 0;
+
+			struct message *m = sim_get_next_message(c);
+			if (m != NULL) // messages
 			{
-				c->next_timing = next;
-				next = c;
+				c->time = m->generation_latency;
+				sim_insert_priority_queue(&priority_queue, c);
+			}
+			else
+			{
+				//INFO("No messages for core %d.%d\n",
+				//	c->t->id, c->offset);
 			}
 		}
 	}
 
-	for (struct core *curr = next; curr != NULL; curr = curr->next_timing)
+#ifdef DEBUG2
+	int i = 0;
+	for (struct core *curr = priority_queue; curr != NULL; curr = curr->next_timing)
 	{
-		TRACE2("curr:%d.%d\n", curr->t->id, curr->id);
+		TRACE2("(%d) curr:%d.%d t:%e\n", i++, curr->t->id, curr->id,
+			curr->time);
 	}
+#endif
 
-	return next;
+	return priority_queue;
 }
 
-struct core *sim_update_timing_queue(struct core *top_priority)
+struct core *sim_pop_priority_queue(struct core **priority_queue)
 {
-	struct core *next, *tmp;
+	struct core *curr;
+
+	// Pop the first element from the priority queue
+	curr = *priority_queue;
+	*priority_queue = (*priority_queue)->next_timing;
+
+	// For safety, remove current element from queue and unlink
+	curr->next_timing = NULL;
+	return curr;
+}
+
+void sim_insert_priority_queue(struct core **priority_queue, struct core *c)
+{
+	struct core *next;
 	int list_depth = 0;
 
-	if ((top_priority == NULL) || (top_priority->next_timing == NULL) ||
-		(top_priority->time <= top_priority->next_timing->time))
+	assert(priority_queue != NULL);
+
+	//INFO("Inserting into priority queue.\n");
+	if (((*priority_queue) == NULL) || (c->time <= (*priority_queue)->time))
 	{
-		// Do nothing
-		return top_priority;
+		// Queue is empty or this is the earliest time (highest
+		//  priority), make this core the head of the queue
+		c->next_timing = (*priority_queue);
+		*priority_queue = c;
 	}
 	else
 	{
-		struct core *curr = top_priority;
-		next = top_priority->next_timing;
+		struct core *curr = *priority_queue;
+		next = curr->next_timing;
 
-		tmp = top_priority;
-		top_priority = next;
-		// reinsert core into the correct place in the priority list
+		// Reinsert core into the correct place in the priority list
 		while (next != NULL)
 		{
-			if (tmp->time < next->time)
+			if (c->time < next->time)
 			{
 				break;
 			}
@@ -514,20 +596,25 @@ struct core *sim_update_timing_queue(struct core *top_priority)
 			next = curr->next_timing;
 			list_depth++;
 		}
-		curr->next_timing = tmp;
-		tmp->next_timing = next;
+		curr->next_timing = c;
+		c->next_timing = next;
 	}
 
-	for (struct core *tmp = top_priority; tmp != NULL;
+#ifdef DEBUG
+	TRACE3("*** Priority queue ***\n");
+	for (struct core *tmp = *priority_queue; tmp != NULL;
 		tmp = tmp->next_timing)
 	{
+		// TRACE3
 		TRACE3("tmp->time:%e (id:%d)\n", tmp->time, tmp->id);
 		assert((tmp->next_timing == NULL) ||
 			tmp->time <= tmp->next_timing->time);
 	}
-	TRACE2("List depth = %d\n", list_depth);
+	// TRACE2
+	TRACE3("List depth = %d\n", list_depth+1);
+#endif
 
-	return top_priority;
+	return;
 }
 
 int sim_input_spikes(struct network *net)
@@ -569,29 +656,26 @@ int sim_input_spikes(struct network *net)
 			//  Normally, we would have a number of input dimensions
 			//  for a given network
 			struct neuron *post_neuron;
-			struct connection *connection_ptr;
+			struct connection *con;
 
-			connection_ptr = &(in->connections[j]);
-			assert(connection_ptr);
+			con = &(in->connections[j]);
+			assert(con);
 
-			post_neuron = connection_ptr->post_neuron;
+			post_neuron = con->post_neuron;
 			TRACE3("nid:%d Energy before: %lf\n", post_neuron->id,
 				post_neuron->current);
 			if (post_neuron->core->buffer_pos == BUFFER_SOMA)
 			{
-				post_neuron->charge += connection_ptr->weight;
+				post_neuron->charge += con->weight;
 			}
 			else
 			{
-				post_neuron->current += connection_ptr->weight;
+				post_neuron->current += con->weight;
 			}
 			TRACE3("nid:%d Energy after: %lf\n", post_neuron->id,
 				post_neuron->current);
 
-			post_neuron->synapse_hw->energy +=
-				post_neuron->synapse_hw->energy_spike_op;
-			post_neuron->synapse_hw->time +=
-				post_neuron->synapse_hw->time_spike_op;
+			con->synapse_hw->time += con->synapse_hw->latency_spike_op;
 
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
@@ -621,11 +705,11 @@ double sim_update_synapse(struct timestep *const ts,
 	//  update filtered current and any other connection properties
 	struct core *post_core;
 	double latency, min_synaptic_resolution;
-	int spike_ops, memory_accesses;
+	//int spike_ops;
 
 	latency = 0.0;
 	post_core = axon->connections[0]->post_neuron->core;
-	spike_ops = axon->connection_count;
+	//spike_ops = axon->connection_count;
 
 	TRACE1("Updating synapses for (cid:%d)\n", axon->pre_neuron->id);
 	while (axon->last_updated <= ts->timestep)
@@ -645,8 +729,8 @@ double sim_update_synapse(struct timestep *const ts,
 				// "Turn off" synapses that have basically no
 				//  synaptic current left to decay (based on
 				//  the weight resolution)
-				min_synaptic_resolution =
-					1.0 / post_core->synapse.weight_bits;
+				min_synaptic_resolution = (1.0 /
+					con->synapse_hw->weight_bits);
 				if (fabs(con->current) <
 					min_synaptic_resolution)
 				{
@@ -669,30 +753,12 @@ double sim_update_synapse(struct timestep *const ts,
 
 	if (synaptic_lookup)
 	{
+		if (axon->connection_count > 0)
+		{
+			latency += post_core->axon_in.latency_spike_message;
+			post_core->axon_in.spike_messages_in++;
+		}
 		axon->active_synapses = axon->connection_count;
-		// Simple memory access model where we consider the number of
-		//  words accessed and the cost per access
-		memory_accesses =
-			(spike_ops +
-				(post_core->synapse.weights_per_word - 1)) /
-			(post_core->synapse.weights_per_word);
-		TRACE2("weights_per_word:%d memory_acceses:%d\n",
-			post_core->synapse.weights_per_word, memory_accesses);
-		post_core->synapse.energy +=
-			memory_accesses *
-			post_core->synapse.energy_memory_access;
-		latency +=
-			memory_accesses * post_core->synapse.time_memory_access;
-
-		post_core->synapse.energy +=
-			spike_ops * post_core->synapse.energy_spike_op;
-		//latency += spike_ops * post_core->synapse.time_spike_op;
-		// TODO: generalize, number of parallel processing units
-		latency += floor(((double) spike_ops + 3.0) / 4.0) *
-			   (post_core->synapse.time_spike_op * 4.0);
-		post_core->synapse.total_spikes += spike_ops;
-		ts->spikes += spike_ops;
-		post_core->synapse.memory_reads += memory_accesses;
 
 		for (int i = 0; i < axon->connection_count; i++)
 		{
@@ -703,8 +769,12 @@ double sim_update_synapse(struct timestep *const ts,
 			post_neuron = con->post_neuron;
 			post_neuron->update_needed = 1;
 			post_neuron->spike_count++;
+
+			assert(con->synapse_hw != NULL);
+			con->synapse_hw->spikes_processed++;
 			TRACE2("Sending spike to nid:%d, current:%lf\n",
 				post_neuron->id, con->current);
+			latency += con->synapse_hw->latency_spike_op;
 
 			if (post_core->buffer_pos != BUFFER_DENDRITE)
 			{
@@ -758,17 +828,9 @@ double sim_update_soma(
 	double latency = 0.0;
 	struct soma_processor *soma = n->soma_hw;
 
-	if (!n->update_needed)
-	{
-		// Inactive neuron update cost
-		TRACE2("nid:%d not updated.\n", n->id);
-		latency += n->soma_hw->time_inactive_neuron_update;
-		n->soma_hw->energy += n->soma_hw->energy_inactive_neuron_update;
-		return latency;
-	}
-
 	TRACE1("nid:%d updating, current_in:%lf\n", n->id, current_in);
-	if (soma->model == NEURON_LIF)
+	if ((soma->model == NEURON_LIF) ||
+		(soma->model == NEURON_STOCHASTIC_LIF))
 	{
 		latency += sim_update_soma_lif(ts, n, current_in);
 	}
@@ -785,12 +847,14 @@ double sim_update_soma(
 	return latency;
 }
 
-double sim_generate_noise(struct core *c)
+double sim_generate_noise(struct neuron *n)
 {
+	assert(n != NULL);
+	struct soma_processor *soma_hw = n->soma_hw;
 	int noise_val = 0;
 	int ret;
 
-	if (c->noise_type == NOISE_FILE_STREAM)
+	if (soma_hw->noise_type == NOISE_FILE_STREAM)
 	{
 		// With a noise stream, we have a file containing a series of
 		//  random values. This is useful if we want to exactly
@@ -800,13 +864,13 @@ double sim_generate_noise(struct core *c)
 		// If we get to the end of the stream, by default reset it.
 		//  However, it is unlikely the stream will be correct at this
 		//  point
-		if (feof(c->noise_stream))
+		if (feof(soma_hw->noise_stream))
 		{
 			INFO("Warning: At the end of the noise stream. "
 			     "Random values are unlikely to be correct.\n");
-			fseek(c->noise_stream, 0, SEEK_SET);
+			fseek(soma_hw->noise_stream, 0, SEEK_SET);
 		}
-		fgets(noise_str, MAX_NOISE_FILE_ENTRY, c->noise_stream);
+		fgets(noise_str, MAX_NOISE_FILE_ENTRY, soma_hw->noise_stream);
 		ret = sscanf(noise_str, "%d", &noise_val);
 		TRACE2("noise val:%d\n", noise_val);
 		if (ret < 1)
@@ -838,7 +902,8 @@ double sim_update_soma_lif(
 	//  integate inputs and apply any potential leak
 	TRACE1("Updating potential, before:%f\n", n->potential);
 
-	if (soma->model == NEURON_LIF)
+	if ((soma->model == NEURON_LIF) ||
+		(soma->model == NEURON_STOCHASTIC_LIF))
 	{
 		while (n->soma_last_updated <= ts->timestep)
 		{
@@ -848,9 +913,10 @@ double sim_update_soma_lif(
 	}
 
 	// Add randomized noise to potential if enabled
-	if (n->core->noise_type == NOISE_FILE_STREAM)
+	if ((soma->model == NEURON_STOCHASTIC_LIF) &&
+		(soma->noise_type == NOISE_FILE_STREAM))
 	{
-		random_potential = sim_generate_noise(n->core);
+		random_potential = sim_generate_noise(n);
 		n->potential += random_potential;
 	}
 
@@ -875,7 +941,6 @@ double sim_update_soma_lif(
 			n->potential -= n->threshold;
 		}
 		latency += sim_neuron_send_spike(n);
-		soma->spikes_sent++;
 	}
 
 	// Check against reverse threshold
@@ -897,12 +962,14 @@ double sim_update_soma_lif(
 
 	// Update soma, if there are any received spikes, there is a non-zero
 	//  bias or we force the neuron to update every time-step
-	if (n->spike_count || (fabs(n->bias) > 0.0) || n->force_update)
+	if ((fabs(n->potential) > 0.0) || n->spike_count ||
+		(fabs(n->bias) > 0.0) || n->force_update)
 	{
-		latency += n->soma_hw->time_active_neuron_update;
-		soma->updates++;
-		n->soma_hw->energy += n->soma_hw->energy_active_neuron_update;
+		latency += n->soma_hw->latency_update_neuron;
+		soma->neuron_updates++;
 	}
+
+	latency += n->soma_hw->latency_access_neuron;
 
 	return latency;
 }
@@ -1001,8 +1068,8 @@ double sim_neuron_send_spike(struct neuron *n)
 	struct soma_processor *soma = n->soma_hw;
 	double latency = 0.0;
 
-	latency += soma->time_spiking;
-	soma->energy += soma->energy_spiking;
+	latency += soma->latency_spiking;
+	soma->neurons_fired++;
 	if (n->core->buffer_pos != BUFFER_AXON_OUT)
 	{
 		TRACE1("nid:%d fired.\n", n->id);
@@ -1049,31 +1116,54 @@ double sim_calculate_time(const struct architecture *const arch)
 double sim_calculate_energy(const struct architecture *const arch)
 {
 	// Returns the total energy across the design, for this timestep
-	double total_energy, dendrite_energy, soma_energy, synapse_energy;
-	double axon_energy, network_energy;
+	double network_energy, synapse_energy, soma_energy, axon_out_energy;
+	double axon_in_energy, total_energy;
 
-	synapse_energy = 0.0;
-	dendrite_energy = 0.0;
-	soma_energy = 0.0;
-	axon_energy = 0.0;
 	network_energy = 0.0;
+	axon_in_energy = 0.0;
+	synapse_energy = 0.0;
+	soma_energy = 0.0;
+	axon_out_energy = 0.0;
 
 	for (int i = 0; i < arch->tile_count; i++)
 	{
 		const struct tile *t = &(arch->tiles[i]);
-		network_energy += t->energy;
+		double total_hop_energy = t->east_hops * t->energy_east_hop;
+
+		total_hop_energy += t->west_hops * t->energy_west_hop;
+		total_hop_energy += t->south_hops * t->energy_south_hop;
+		total_hop_energy +=  t->north_hops * t->energy_north_hop;
+		network_energy += total_hop_energy;
 
 		for (int j = 0; j < t->core_count; j++)
 		{
 			const struct core *c = &(t->cores[j]);
-			synapse_energy += c->synapse.energy;
-			soma_energy += c->soma.energy;
-			axon_energy += c->axon_out.energy;
+
+			axon_in_energy += c->axon_in.spike_messages_in *
+				c->axon_in.energy_spike_message;
+			for (int k = 0; k < ARCH_MAX_UNITS; k++)
+			{
+				synapse_energy +=
+					c->synapse[k].spikes_processed *
+					c->synapse[k].energy_spike_op;
+				// TODO: figure which neurons are mapped to this
+				//  soma?
+				soma_energy += c->soma[k].neuron_count *
+					c->soma[k].energy_access_neuron;
+				soma_energy += c->soma[k].neuron_updates *
+					c->soma[k].energy_update_neuron;
+				soma_energy += c->soma[k].neurons_fired *
+					c->soma[k].energy_spiking;
+			}
+
+			axon_out_energy += c->axon_out.packets_out *
+				c->axon_out.energy_access;
 		}
 	}
 
-	total_energy = synapse_energy + dendrite_energy + soma_energy +
-		       axon_energy + network_energy;
+	total_energy = axon_in_energy + synapse_energy + soma_energy +
+		axon_out_energy + network_energy;
+
 	return total_energy;
 }
 
@@ -1112,6 +1202,13 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 		t->energy = 0.0;
 		t->time = 0.0;
 		t->blocked_until = 0.0;
+
+		t->hops = 0;
+		t->east_hops = 0;
+		t->west_hops = 0;
+		t->south_hops = 0;
+		t->north_hops = 0;
+		t->messages_received = 0;
 		for (int j = 0; j < t->core_count; j++)
 		{
 			struct core *c = &(t->cores[j]);
@@ -1126,15 +1223,23 @@ void sim_reset_measurements(struct network *net, struct architecture *arch)
 
 			c->axon_in.energy = 0.0;
 			c->axon_in.time = 0;
-
-			c->synapse.energy = 0.0;
-			c->synapse.time = 0.0;
-
 			c->dendrite.energy = 0.0;
 			c->dendrite.time = 0.0;
 
-			c->soma.energy = 0.0;
-			c->soma.time = 0.0;
+			for (int k = 0; k < c->synapse_count; k++)
+			{
+				c->synapse[k].energy = 0.0;
+				c->synapse[k].time = 0.0;
+				c->synapse[k].spikes_processed = 0;
+			}
+
+			for (int k = 0; k < c->soma_count; k++)
+			{
+				c->soma[k].energy = 0.0;
+				c->soma[k].time = 0.0;
+				c->soma[k].neuron_updates = 0;
+				c->soma[k].neurons_fired = 0;
+			}
 
 			c->axon_out.energy = 0.0;
 			c->axon_out.time = 0.0;

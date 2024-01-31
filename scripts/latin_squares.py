@@ -23,7 +23,7 @@ PROJECT_DIR = os.path.abspath((os.path.join(SCRIPT_DIR, os.pardir)))
 sys.path.insert(0, os.path.join(PROJECT_DIR))
 import sim
 
-ARCH_FILENAME = "arch/loihi_latin.yaml"
+ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
 LOIHI_TILES = int(LOIHI_CORES / LOIHI_CORES_PER_TILE)
@@ -169,14 +169,16 @@ def run_experiment(network_filename):
 
 
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiment = True
 
     if run_experiments:
         if (os.path.isfile(os.path.join(PROJECT_DIR, "runs", "latin",
                            "loihi_latin.csv"))):
-            open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
-                 "w")
+            with open(os.path.join(PROJECT_DIR, "runs", "latin", "sim_latin.csv"),
+                 "w") as latin_squares_file:
+                latin_squares_file.write("N,network,sim_energy,sim_latency\n")
+
             with open(os.path.join(PROJECT_DIR, "runs", "latin",
                                     "loihi_latin.csv")) as latin_squares_file:
                 reader = csv.DictReader(latin_squares_file)

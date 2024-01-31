@@ -58,7 +58,7 @@ double sim_update_synapse(struct timestep *const ts, struct connection_map *axon
 double sim_update_dendrite(struct timestep *const ts, struct neuron *n, const double charge);
 double sim_update_soma(struct timestep *const ts, struct neuron *n, const double current_in);
 double sim_update_axon(struct neuron *n);
-double sim_estimate_network_costs(struct timestep *const ts, struct tile *const src, struct tile *const dest);
+double sim_estimate_network_costs(struct tile *const src, struct tile *const dest);
 
 double sim_update_soma_lif(struct timestep *const ts, struct neuron *n, const double current_in);
 double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n, const double current_in);
@@ -81,7 +81,8 @@ void sim_perf_log_timestep(const struct timestep *const ts, FILE *fp);
 int sim_poisson_input(const double firing_probability);
 int sim_rate_input(const double firing_rate, double *spike_val);
 
-struct core *sim_init_timing_priority(struct architecture *arch);
-struct core *sim_update_timing_queue(struct core *top_priority);
+struct core *sim_init_timing_priority(struct architecture *arch, struct timestep *ts);
+void sim_insert_priority_queue(struct core **priority_queue, struct core *c);
+struct core *sim_pop_priority_queue(struct core **priority_queue);
 
 #endif

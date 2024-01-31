@@ -6,7 +6,7 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 """
 # External libraries, plotting
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 
 # Other external libraries
@@ -30,8 +30,10 @@ import sim
 # Use a dumb seed to get consistent results
 random.seed(1)
 
+EXPERIMENT = "tiny"
 # Global experiment parameters
-NETWORK_FILENAME = "runs/random/random.net"
+NETWORK_PATH = os.path.join("runs", "random", EXPERIMENT)
+NETWORK_FILENAME = os.path.join(NETWORK_PATH, "random.net")
 ARCH_FILENAME = "arch/loihi.yaml"
 LOIHI_CORES = 128
 LOIHI_CORES_PER_TILE = 4
@@ -94,17 +96,27 @@ def run_sim(timesteps, cores, neurons_per_core, messages_per_core, spikes_per_me
     return summary
 
 
+
+def onpick(event, df):
+    N = len(event.ind)
+    if not N:
+        return
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(df.iloc[event.ind])
+
+
 if __name__ == "__main__":
-    run_experiments = False
+    run_experiments = True
     plot_experiments = True
     if run_experiments:
-        with open("runs/random/loihi_random.csv", "r") as csv_file:
+        with open(os.path.join(NETWORK_PATH, "loihi_random.csv"),
+            "r") as csv_file:
             reader = csv.DictReader(csv_file)
             fieldnames = reader.fieldnames
             fieldnames.append("sim_energy")
             fieldnames.append("sim_latency")
             fieldnames.append("total_spikes")
-            with open("runs/random/sim_random.csv", "w") as out_file:
+            with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "w") as out_file:
                 writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                 writer.writeheader()
 
@@ -119,15 +131,13 @@ if __name__ == "__main__":
                 line["sim_energy"] = results["energy"] / TIMESTEPS
                 line["sim_latency"] = results["time"] / TIMESTEPS
                 print(line)
-                with open("runs/random/sim_random.csv", "a") as out_file:
+                with open(os.path.join(NETWORK_PATH, "sim_random.csv"), "a") as out_file:
                     writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                     writer.writerow(line)
 
     if plot_experiments:
-        sim_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random",
-                                         "sim_random.csv"))
-        loihi_df = pd.read_csv(os.path.join(PROJECT_DIR, "runs", "random",
-                                           "loihi_random.csv"))
+        sim_df = pd.read_csv(os.path.join(NETWORK_PATH, "sim_random.csv"))
+        loihi_df = pd.read_csv(os.path.join(NETWORK_PATH, "loihi_random.csv"))
         df = pd.merge(sim_df, loihi_df)
         # The smallest measurements hit the limits of Loihi's time measuring
         #  precision. Filter out these rows
@@ -161,33 +171,33 @@ if __name__ == "__main__":
         plt.xticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.yticks((1.0e-8, 1.0e-7, 1.0e-6, 1.0e-5))
         plt.tight_layout(pad=0.3)
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
-                                 "random_energy.pdf"))
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
-                                 "random_energy.png"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_energy.pdf"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_energy.png"))
 
         # Plot the simulated vs measured latency
-        plt.figure(figsize=(3.0, 2.2))
+        fig = plt.figure(figsize=(3.0, 2.2))
         plt.minorticks_on()
         plt.gca().set_box_aspect(1)
         plt.xscale("log")
         plt.yscale("log")
         #plt.plot(sim_latency, loihi_latency, "x")
         plt.scatter(sim_latency, loihi_latency, marker="x", c=total_neurons,
-                    cmap=cm, vmin=256, vmax=8192, linewidths=1)
+                    cmap=cm, vmin=256, vmax=8192, linewidths=1,
+                    picker=True, pickradius=5)
         plt.plot(np.linspace(min(sim_latency), max(sim_latency)),
                  np.linspace(min(sim_latency), max(sim_latency)), "k--")
+        fig.canvas.mpl_connect('pick_event', lambda event: onpick(event, df))
+        pd.options.display.width = 300
+        pd.options.display.max_colwidth = 300
         plt.colorbar(label="Neurons", shrink=0.5)
         plt.xlabel("Simulated Latency (s)")
         plt.ylabel("Measured Latency (s)")
         plt.xticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.yticks((1.0e-6, 1.0e-5, 1.0e-4))
         plt.tight_layout(pad=0.3)
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
-                                 "random_latency.pdf"))
-        plt.savefig(os.path.join(PROJECT_DIR, "runs", "random",
-                                 "random_latency.png"))
-
+        plt.savefig(os.path.join(NETWORK_PATH, "random_latency.pdf"))
+        plt.savefig(os.path.join(NETWORK_PATH, "random_latency.png"))
+        plt.show()
 
         absolute_latency_error = np.abs(loihi_latency - sim_latency) / loihi_latency
         absolute_energy_error = np.abs(loihi_energy - sim_energy) / loihi_energy
