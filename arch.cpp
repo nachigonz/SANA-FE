@@ -791,6 +791,7 @@ void arch_add_connection_to_map(
 	if (synapse_id >= post_core->synapse_count)
 	{
 		INFO("Error: Could not map connection to synapse h/w.\n");
+		INFO("Synapse_id %d and Synapse_count %d\n", synapse_id, post_core->synapse_count);
 		exit(1);
 	}
 	con->synapse_hw = synapse_hw;
