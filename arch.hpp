@@ -20,8 +20,8 @@ axon input -> synapse --------> dendrite ------> soma -------> axon output
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "network.h"
-#include "description.h"
+#include "network.hpp"
+#include "description.hpp"
 
 // Hard define maximum defined h/w sizes
 #define ARCH_MAX_COMPARTMENTS 16384
@@ -222,7 +222,7 @@ struct architecture
 	int is_init;
 };
 
-#include "description.h"
+#include "description.hpp"
 
 struct architecture *arch_init(void);
 void arch_free(struct architecture *const arch);

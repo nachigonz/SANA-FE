@@ -15,8 +15,8 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define MAX_NOISE_FILE_ENTRY 128
 
-#include "arch.h"
-#include "network.h"
+#include "arch.hpp"
+#include "network.hpp"
 #include "stdio.h"
 
 struct timestep
@@ -58,6 +58,7 @@ double sim_update_axon(struct neuron *n);
 double sim_estimate_network_costs(struct tile *const src, struct tile *const dest);
 void sim_neuron_send_spike_message(struct timestep *const ts, struct neuron *n);
 
+double sim_update_soma_latency(struct timestep *const ts, struct neuron *n);
 double sim_update_soma_lif(struct timestep *const ts, struct neuron *n, const double current_in);
 double sim_update_soma_truenorth(struct timestep *const ts, struct neuron *n, const double current_in);
 

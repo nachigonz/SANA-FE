@@ -8,10 +8,10 @@
 #include <assert.h>
 #include <math.h>
 
-#include "print.h"
-#include "arch.h"
-#include "network.h"
-#include "description.h"
+#include "print.hpp"
+#include "arch.hpp"
+#include "network.hpp"
+#include "description.hpp"
 
 struct architecture *arch_init(void)
 {
@@ -716,7 +716,7 @@ void arch_allocate_connection_map(struct neuron *const pre_neuron,
 	map_size = connection_count * sizeof(struct connection);
 	TRACE3("Axon has %d connections, allocate %d bytes\n",
 		connection_count, map_size);
-	map->connections = malloc(connection_count * map_size);
+	map->connections = (connection**) malloc(connection_count * map_size);
 	if (map->connections == NULL)
 	{
 		INFO("Error: Couldn't allocate map memory.\n");
@@ -791,6 +791,7 @@ void arch_add_connection_to_map(
 	if (synapse_id >= post_core->synapse_count)
 	{
 		INFO("Error: Could not map connection to synapse h/w.\n");
+		INFO("Synapse_id %d and Synapse_count %d\n", synapse_id, post_core->synapse_count);
 		exit(1);
 	}
 	con->synapse_hw = synapse_hw;
