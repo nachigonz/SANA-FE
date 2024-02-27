@@ -123,6 +123,19 @@ sim/fast:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/build
 .PHONY : sim/fast
 
+#=============================================================================
+# Target rules for targets named simcpp
+
+# Build rule for target.
+simcpp: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 simcpp
+.PHONY : simcpp
+
+# fast build rule for target.
+simcpp/fast:
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/build
+.PHONY : simcpp/fast
+
 arch.o: arch.cpp.o
 
 .PHONY : arch.o
@@ -211,6 +224,7 @@ main.o: main.cpp.o
 # target to build an object file
 main.cpp.o:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.o
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.o
 .PHONY : main.cpp.o
 
 main.i: main.cpp.i
@@ -220,6 +234,7 @@ main.i: main.cpp.i
 # target to preprocess a source file
 main.cpp.i:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.i
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.i
 .PHONY : main.cpp.i
 
 main.s: main.cpp.s
@@ -229,6 +244,7 @@ main.s: main.cpp.s
 # target to generate assembly for a file
 main.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.s
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.s
 .PHONY : main.cpp.s
 
 network.o: network.cpp.o
@@ -292,6 +308,7 @@ sim.o: sim.cpp.o
 # target to build an object file
 sim.cpp.o:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.o
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.o
 .PHONY : sim.cpp.o
 
 sim.i: sim.cpp.i
@@ -301,6 +318,7 @@ sim.i: sim.cpp.i
 # target to preprocess a source file
 sim.cpp.i:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.i
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.i
 .PHONY : sim.cpp.i
 
 sim.s: sim.cpp.s
@@ -310,6 +328,7 @@ sim.s: sim.cpp.s
 # target to generate assembly for a file
 sim.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.s
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.s
 .PHONY : sim.cpp.s
 
 # Help Target
@@ -321,6 +340,7 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... sim"
+	@echo "... simcpp"
 	@echo "... arch.o"
 	@echo "... arch.i"
 	@echo "... arch.s"
