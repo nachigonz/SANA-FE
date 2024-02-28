@@ -224,7 +224,6 @@ main.o: main.cpp.o
 # target to build an object file
 main.cpp.o:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.o
-	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.o
 .PHONY : main.cpp.o
 
 main.i: main.cpp.i
@@ -234,7 +233,6 @@ main.i: main.cpp.i
 # target to preprocess a source file
 main.cpp.i:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.i
-	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.i
 .PHONY : main.cpp.i
 
 main.s: main.cpp.s
@@ -244,8 +242,37 @@ main.s: main.cpp.s
 # target to generate assembly for a file
 main.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/main.cpp.s
-	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/main.cpp.s
 .PHONY : main.cpp.s
+
+module.o: module.cpp.o
+
+.PHONY : module.o
+
+# target to build an object file
+module.cpp.o:
+	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/module.cpp.o
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/module.cpp.o
+.PHONY : module.cpp.o
+
+module.i: module.cpp.i
+
+.PHONY : module.i
+
+# target to preprocess a source file
+module.cpp.i:
+	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/module.cpp.i
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/module.cpp.i
+.PHONY : module.cpp.i
+
+module.s: module.cpp.s
+
+.PHONY : module.s
+
+# target to generate assembly for a file
+module.cpp.s:
+	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/module.cpp.s
+	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/module.cpp.s
+.PHONY : module.cpp.s
 
 network.o: network.cpp.o
 
@@ -308,7 +335,6 @@ sim.o: sim.cpp.o
 # target to build an object file
 sim.cpp.o:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.o
-	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.o
 .PHONY : sim.cpp.o
 
 sim.i: sim.cpp.i
@@ -318,7 +344,6 @@ sim.i: sim.cpp.i
 # target to preprocess a source file
 sim.cpp.i:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.i
-	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.i
 .PHONY : sim.cpp.i
 
 sim.s: sim.cpp.s
@@ -328,7 +353,6 @@ sim.s: sim.cpp.s
 # target to generate assembly for a file
 sim.cpp.s:
 	$(MAKE) -f CMakeFiles/sim.dir/build.make CMakeFiles/sim.dir/sim.cpp.s
-	$(MAKE) -f CMakeFiles/simcpp.dir/build.make CMakeFiles/simcpp.dir/sim.cpp.s
 .PHONY : sim.cpp.s
 
 # Help Target
@@ -353,6 +377,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... module.o"
+	@echo "... module.i"
+	@echo "... module.s"
 	@echo "... network.o"
 	@echo "... network.i"
 	@echo "... network.s"
