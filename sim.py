@@ -6,7 +6,7 @@ No. DE-NA0003525 with the U.S. Department of Energy.
 
 sim.py - Simulator script and utility functionality
 """
-import subprocess
+import sys
 import os
 import yaml
 
@@ -497,27 +497,76 @@ project_dir = os.path.dirname(os.path.abspath(__file__))
 def run(arch_path, network_path, timesteps,
         run_dir=os.path.join(project_dir, "runs"),
         perf_trace=True, spike_trace=False, potential_trace=False,
-        message_trace=False):
+        message_trace=False, run_alive=False):
     parsed_filename = os.path.join(run_dir,
                                    os.path.basename(arch_path) + ".parsed")
     parse_file(arch_path, parsed_filename)
-    # Parse inputs and run simulation
-    args = []
-    if spike_trace:
-        args.append("-s",)
-    if potential_trace:
-        args.append("-v")
-    if perf_trace:
-        args.append("-p")
-    if message_trace:
-        args.append("-m")
-    command = [os.path.join(project_dir, "sim"),] + args + [parsed_filename,
-               network_path, f"{timesteps}"]
 
-    print("Command: {0}".format(" ".join(command)))
-    ret = subprocess.call(command)
-    if ret != 0:
-        raise RuntimeError(f"Error: Simulator kernel failed (code={ret}).")
+    # Set some flags for the dynamic linking library
+    # Important to do before importing the simcpp .so library!
+    sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
+    import simcpp as sim
+
+    # Parse inputs and run simulation
+    sana_fe = sim.SANA_FE()
+    if spike_trace:
+        sana_fe.set_spike_flag()
+    if potential_trace:
+        sana_fe.set_pot_flag()
+    if perf_trace:
+        sana_fe.set_perf_flag()
+    if message_trace:
+        sana_fe.set_mess_flag()
+    
+    sana_fe.set_arch(parsed_filename)
+    sana_fe.set_net(network_path)
+
+    if run_alive:
+        while True:
+            if timesteps > 0:
+                print('-----------Inter Run Summary-----------')
+                sana_fe.run_timesteps(timesteps)
+                sana_fe.run_summary()
+                print('---------------------------------------')
+            print("Enter timesteps to run: ", end="")
+            user_in = input()
+
+            if user_in == "q" or user_in == "quit":
+                break
+            if user_in.startswith("u"):
+                try:
+                    group_id = int(user_in[2])
+                except ValueError:
+                    print(f"Error: Expected int. Got \"{user_in[2]}\".")
+                    exit(1)
+
+                try:
+                    n_id = int(user_in[4])
+                except ValueError:
+                    print(f"Error: Expected int. Got \"{user_in[4]}\".")
+                    exit(1)
+
+                user_in = user_in[6:]
+                kwargs = user_in.split(" ")
+                
+                print(group_id, n_id, kwargs, len(kwargs))
+                sana_fe.update_neuron(group_id, n_id, kwargs, len(kwargs))
+
+                timesteps = 0
+                continue
+            try:
+                timesteps = int(user_in)
+            except ValueError:
+                print(f"Error: Expected int. Got {user_in}.")
+                exit(1)
+    else:
+        if timesteps < 1:
+            print(f"Error: Given {timesteps} timesteps, require int > 1.")
+            exit(1)
+        sana_fe.run_timesteps(timesteps)
+    
+    print('-----------Total Run Summary-----------')
+    sana_fe.sim_summary()
 
     with open("run_summary.yaml", "r") as run_summary:
         results = yaml.safe_load(run_summary)
@@ -536,10 +585,11 @@ if __name__ == "__main__":
     parser.add_argument("timesteps", help="Number of timesteps to simulate", type=int)
     parser.add_argument("-s", "--spikes", help="Trace spikes", action="store_true")
     parser.add_argument("-v", "--voltages", help="Trace membrane voltages", action="store_true")
+    parser.add_argument("-r", "--run", help="Keep simulation alive", action="store_true")
 
     args = parser.parse_args()
     print(args)
 
     run(args.architecture, args.snn, args.timesteps,
-        spike_trace=args.spikes, potential_trace=args.voltages)
+        spike_trace=args.spikes, potential_trace=args.voltages, run_alive=args.run)
     print("sim finished")
