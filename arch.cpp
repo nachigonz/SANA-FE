@@ -31,6 +31,7 @@ struct architecture *arch_init(void)
 	arch->tile_count = 0;
 	arch->core_count = 0;
 	arch->is_init = 0;
+	arch->spike_vector_on = 0;
 
 	return arch;
 }
