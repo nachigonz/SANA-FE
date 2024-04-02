@@ -5,6 +5,7 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import customtkinter
 from tkinterdnd2 import DND_FILES, TkinterDnD
+from tkinter import filedialog
 
 #IMG PROCESSING
 import cv2
@@ -107,16 +108,35 @@ class SANAFEApp(TkinterDnD.Tk):
         self.canvas.config(image=self.img)
         self.canvas.image = self.img
 
-        self.arch_input = tk.Listbox(self.home_frame)
-        self.arch_input.insert(1, "drag arch file here")
-        self.arch_input.drop_target_register(DND_FILES)
-        self.arch_input.dnd_bind('<<Drop>>', self.drop_arch)
-        self.arch_input.grid(row=3, column=0, columnspan=1, pady=20,padx=20, sticky="e")
-        self.snn_input = tk.Listbox(self.home_frame)
-        self.snn_input.insert(1, "drag snn file here")
-        self.snn_input.drop_target_register(DND_FILES)
-        self.snn_input.dnd_bind('<<Drop>>', self.drop_snn)
-        self.snn_input.grid(row=3, column=1, columnspan=1, pady=20,padx=20)
+        ##### FILE INPUTS #####
+        # self.arch_input = tk.Listbox(self.home_frame)
+        # self.arch_input.insert(1, "drag arch file here")
+        # self.arch_input.drop_target_register(DND_FILES)
+        # self.arch_input.dnd_bind('<<Drop>>', self.drop_arch)
+        self.arch_label = Label(self.home_frame, 
+                            text = "Architecture File",
+                            width = 50, height = 4, 
+                            fg = "blue")
+        self.arch_label.grid(row=3, column=0, columnspan=1, pady=20,padx=20, sticky="e")
+        self.arch_input = customtkinter.CTkButton(self.home_frame, command= self.upload_arch)
+        self.arch_input.configure(height = 80)
+        self.arch_input.configure(text = "UPLOAD ARCH")
+        self.arch_input.grid(pady = 3, row=2, column=2)
+        self.arch_input.grid(row=4, column=0, columnspan=1, pady=20,padx=20, sticky="e")
+        # self.snn_input = tk.Listbox(self.home_frame)
+        # self.snn_input.insert(1, "drag snn file here")
+        # self.snn_input.drop_target_register(DND_FILES)
+        # self.snn_input.dnd_bind('<<Drop>>', self.drop_snn)
+        self.snn_label = Label(self.home_frame, 
+                            text = "SNN File",
+                            width = 50, height = 4, 
+                            fg = "blue")
+        self.snn_label.grid(row=3, column=1, columnspan=1, pady=20,padx=20, sticky="e")
+        self.snn_input = customtkinter.CTkButton(self.home_frame, command= self.upload_snn)
+        self.snn_input.configure(height = 80)
+        self.snn_input.configure(text = "UPLOAD SNN")
+        self.snn_input.grid(pady = 3, row=2, column=2)
+        self.snn_input.grid(row=4, column=1, columnspan=1, pady=20,padx=20)
 
         self.demo_frame = customtkinter.CTkFrame(self, bg_color="black", width=1600, height=1100)
         self.demo_frame.configure(corner_radius = 8)
@@ -159,6 +179,26 @@ class SANAFEApp(TkinterDnD.Tk):
         self.home_button()
 
         self.update()
+
+    def upload_arch(self):
+        filename = filedialog.askopenfilename(initialdir = "/",
+                                          title = "Select a File",
+                                          filetypes = (("Text files",
+                                                        "*.txt*"),
+                                                       ("all files",
+                                                        "*.*")))
+        self.arch_label.configure(text="File Opened: "+filename)
+        pass
+
+    def upload_snn(self):
+        filename = filedialog.askopenfilename(initialdir = "/",
+                                          title = "Select a File",
+                                          filetypes = (("Text files",
+                                                        "*.txt*"),
+                                                       ("all files",
+                                                        "*.*")))
+        self.snn_label.configure(text="File Opened: "+filename)
+        pass
 
     def init_button(self):
         architecture = "arch/loihi.yaml" #self.arch_input.get(0)

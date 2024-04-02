@@ -589,6 +589,34 @@ def run(arch_path, network_path, timesteps,
 
     return results
 
+def run_from_gui(arch_path, network_path,
+        run_dir=os.path.join(project_dir, "runs"),
+        perf_trace=True, spike_trace=False, potential_trace=False,
+        message_trace=False):
+    parsed_filename = os.path.join(run_dir,
+                                   os.path.basename(arch_path) + ".parsed")
+    parse_file(arch_path, parsed_filename)
+
+    # Set some flags for the dynamic linking library
+    # Important to do before importing the simcpp .so library!
+    sys.setdlopenflags(os.RTLD_GLOBAL | os.RTLD_LAZY)
+    import simcpp as sim
+
+    # Parse inputs and run simulation
+    sana_fe = sim.SANA_FE()
+    if spike_trace:
+        sana_fe.set_spike_flag()
+    if potential_trace:
+        sana_fe.set_pot_flag()
+    if perf_trace:
+        sana_fe.set_perf_flag()
+    if message_trace:
+        sana_fe.set_mess_flag()
+    
+    sana_fe.set_arch(parsed_filename)
+    sana_fe.set_net(network_path)
+
+    return sana_fe
 
 if __name__ == "__main__":
     # Run SANA-FE from the command-line
