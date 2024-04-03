@@ -164,7 +164,7 @@ class SANAFEApp(TkinterDnD.Tk):
         if ret:
             frame = cv2.cvtColor(frame,  cv2.COLOR_BGR2GRAY)
             frame = cv2.GaussianBlur(frame, (5, 5), 0)
-            frame = cv2.resize(frame, (660, 540))
+            frame = cv2.resize(frame, (320, 320))
 
             self.prev_frame = frame.copy()
 
@@ -177,6 +177,14 @@ class SANAFEApp(TkinterDnD.Tk):
             self.video2_label.image = self.photo2
 
         self.home_button()
+
+        architecture = "arch/loihi.yaml" #self.arch_input.get(0)
+        snn = "snn/dvs_gesture_32x32.net" #self.snn_input.get(0)
+        spikes = False
+        voltages = False
+        self.sanafe_demo = sim.run_from_gui(architecture, snn,
+            spike_trace=spikes, potential_trace=voltages)
+        print("initialized demo simulator")
 
         self.update()
 
@@ -289,7 +297,7 @@ class SANAFEApp(TkinterDnD.Tk):
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             frame = cv2.GaussianBlur(frame, (5, 5), 0)
-            frame = cv2.resize(frame, (660, 540))
+            frame = cv2.resize(frame, (320, 320))
             self.photo = ImageTk.PhotoImage(image=Image.fromarray(frame))
             self.video1_label.config(image=self.photo)
             self.video1_label.image = self.photo
@@ -298,18 +306,36 @@ class SANAFEApp(TkinterDnD.Tk):
             threshold = 30
             _, thresholded = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
 
+            start = time.time()
+            flattened = thresholded.reshape(32, 10, 32, 10) #TODO: preliminary average pooling
+            flattened = flattened.mean(axis=(1,3))
+            flattened = flattened.flatten()
+            for f in range(len(flattened)):
+                b = 0 
+                if flattened[f] != 0: b = 1
+                self.sanafe_demo.update_neuron(0, f, ["update_neuron"], 1)
+            end = time.time()
+            self.sanafe_demo.run_timesteps(1)
+            #self.sanafe_demo.run_summary()
+            complete = time.time()
+            print("Send to Sim Time:")
+            print(end-start)
+            print("Total Timestep:")
+            print(complete-start)
+            print(self.sanafe_demo.get_status(5))
+
             self.photo2 = ImageTk.PhotoImage(image=Image.fromarray(thresholded))
             self.video2_label.config(image=self.photo2)
             self.video2_label.image = self.photo2
 
             self.prev_frame = frame.copy()
             
-        self.video1_label.after(10, self.update)
+        self.video1_label.after(1000, self.update)
 
 MYHANDLER_SENDER = 'myhandler_sender'
 MYHANDLER_SIGNAL = 'myhandler_signal'
 TEST_FILE = 'spikes.csv'
-TEST_DIR = '/home/lance/senior-design/merge_sanafe/SANA-FE/'
+TEST_DIR = '/Documents/SANA-FE/'
 THRESHOLD_TIME = 0.01
 
 class FileUpdateHandler(FileSystemEventHandler):
@@ -359,11 +385,11 @@ def dispatcher_receive(message):
 if __name__ == "__main__":
     app = SANAFEApp()
 
-    event_handler = FileUpdateHandler(app=app)
-    dispatcher.connect(dispatcher_receive, signal=MYHANDLER_SIGNAL, sender=MYHANDLER_SENDER)
-    observer = Observer()
-    observer.schedule(event_handler, path=TEST_DIR, recursive=False)
-    observer.start()
+    #event_handler = FileUpdateHandler(app=app)
+    #dispatcher.connect(dispatcher_receive, signal=MYHANDLER_SIGNAL, sender=MYHANDLER_SENDER)
+    #observer = Observer()
+    #observer.schedule(event_handler, path=TEST_DIR, recursive=False)
+    #observer.start()
 
     app.mainloop()
     
