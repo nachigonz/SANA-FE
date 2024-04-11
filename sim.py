@@ -612,6 +612,8 @@ def run_from_gui(arch_path, network_path,
         sana_fe.set_perf_flag()
     if message_trace:
         sana_fe.set_mess_flag()
+
+    sana_fe.set_gui_flag()
     
     sana_fe.set_arch(parsed_filename)
     sana_fe.set_net(network_path)

@@ -303,7 +303,7 @@ class SANAFEApp(TkinterDnD.Tk):
                 b = 0 
                 if frame[f] != 0:
                     b = 1
-                    self.sanafe_demo.update_neuron(0, f, ["input_spike=10.0"], 1)
+                    self.sanafe_demo.update_neuron(0, f, ["bias=10.0"], 1)
             self.sanafe_demo.run_timesteps(1)
 
             res = self.sanafe_demo.get_status(5)
