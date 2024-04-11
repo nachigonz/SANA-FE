@@ -159,12 +159,16 @@ class SANAFEApp(TkinterDnD.Tk):
         self.video2_label = ttk.Label(self.demo_frame, width= 660)
         self.video2_label.grid(row=1, column=1)
 
+        #OUTPUT
+        self.demo_label = tk.Label(self.demo_frame, text="Gesture Output", font=("Helvetica", 40),foreground="white",background="#2b2b2b")
+        self.demo_label.grid(row=2, column=0, columnspan=2, pady=20)
+        self.frame_list = []
 
         ret, frame = self.cap.read()
         if ret:
             frame = cv2.cvtColor(frame,  cv2.COLOR_BGR2GRAY)
             frame = cv2.GaussianBlur(frame, (5, 5), 0)
-            frame = cv2.resize(frame, (320, 320))
+            frame = cv2.resize(frame, (640, 640))
 
             self.prev_frame = frame.copy()
 
@@ -292,12 +296,29 @@ class SANAFEApp(TkinterDnD.Tk):
                 print('Error: reported event.widget not known')
         return event.action
 
+    def consume_frames(self):
+        outputs = []
+        for frame in self.frame_list:
+            for f in range(len(frame)):
+                b = 0 
+                if frame[f] != 0:
+                    b = 1
+                    self.sanafe_demo.update_neuron(0, f, ["input_spike=10.0"], 1)
+            self.sanafe_demo.run_timesteps(1)
+
+            res = self.sanafe_demo.get_status(5)
+            for i in range(len(res)):
+                if(res[i] == 2): outputs.append(i)
+
+        print(outputs)
+        self.frame_list = []
+
     def update(self):
         ret, frame = self.cap.read()
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             frame = cv2.GaussianBlur(frame, (5, 5), 0)
-            frame = cv2.resize(frame, (320, 320))
+            frame = cv2.resize(frame, (640, 640))
             self.photo = ImageTk.PhotoImage(image=Image.fromarray(frame))
             self.video1_label.config(image=self.photo)
             self.video1_label.image = self.photo
@@ -307,22 +328,27 @@ class SANAFEApp(TkinterDnD.Tk):
             _, thresholded = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
 
             start = time.time()
-            flattened = thresholded.reshape(32, 10, 32, 10) #TODO: preliminary average pooling
-            flattened = flattened.mean(axis=(1,3))
+            flattened = cv2.resize(thresholded, (32, 32))
+            #flattened = flattened.mean(axis=(1,3))
             flattened = flattened.flatten()
-            for f in range(len(flattened)):
-                b = 0 
-                if flattened[f] != 0: b = 1
-                self.sanafe_demo.update_neuron(0, f, ["update_neuron"], 1)
+            # for f in range(len(flattened)):
+            #     b = 0 
+            #     if flattened[f] != 0: b = 1
+            #     self.sanafe_demo.update_neuron(0, f, ["input_spike=5.0"], 1)
+
+            self.frame_list.append(flattened)
+            if(len(self.frame_list) >= 50): self.consume_frames()
+
             end = time.time()
-            self.sanafe_demo.run_timesteps(1)
+            #self.sanafe_demo.run_timesteps(1)
             #self.sanafe_demo.run_summary()
             complete = time.time()
             print("Send to Sim Time:")
             print(end-start)
             print("Total Timestep:")
             print(complete-start)
-            print(self.sanafe_demo.get_status(5))
+            # print(self.sanafe_demo.get_status(5))
+            # self.demo_label.configure(text = self.sanafe_demo.get_status(5))
 
             self.photo2 = ImageTk.PhotoImage(image=Image.fromarray(thresholded))
             self.video2_label.config(image=self.photo2)
@@ -330,7 +356,7 @@ class SANAFEApp(TkinterDnD.Tk):
 
             self.prev_frame = frame.copy()
             
-        self.video1_label.after(1000, self.update)
+        self.video1_label.after(100, self.update)
 
 MYHANDLER_SENDER = 'myhandler_sender'
 MYHANDLER_SIGNAL = 'myhandler_signal'

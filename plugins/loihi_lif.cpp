@@ -128,7 +128,7 @@ class loihi_lif: public Base_Soma {
                 else if (strncmp("input_spike", a->key, MAX_FIELD_LEN) == 0){
                     double res;
                     ret = sscanf(a->value_str, "%lf", &res);
-                    potential += res;
+                    bias += res;
                 }
                 if (ret < 1)
                 {
