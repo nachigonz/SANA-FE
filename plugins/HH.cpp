@@ -73,7 +73,7 @@ class HH: public Base_Soma { // Hodgkin-Huxley model inspired by this paper: htt
                 }
                 else if (strncmp("current", a->key, MAX_FIELD_LEN) == 0)
                 {
-                    ret = sscanf(a->value_str, "%lf", &current);
+                    ret = sscanf(a->value_str, "%lf", &I);
                 }
                 if (ret < 1)
                 {

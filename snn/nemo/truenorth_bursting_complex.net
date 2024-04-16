@@ -1,0 +1,23 @@
+# neuron groups
+g 1 threshold=300 soma_hw_name=TN_lif  synapse_hw_name=current_based_uncompressed  reset=0  reverse_threshold=0  reverse_reset=0  leak_bias=0  reset_mode=hard  reverse_reset_mode=none
+g 1 threshold=18  soma_hw_name=TN_lif  synapse_hw_name=current_based_uncompressed  reset=1  reverse_threshold=0  reverse_reset=1  leak_bias=-1 reset_mode=hard  reverse_reset_mode=saturate
+g 1 threshold=6   soma_hw_name=TN_lif  synapse_hw_name=current_based_uncompressed  reset=0  reverse_threshold=0  reverse_reset=0  leak_bias=0  reset_mode=hard  reverse_reset_mode=saturate
+
+n 0.0 bias=1.0 log_spikes=1 force_update=1 connections_out=2
+e 0.0->1.0 w=1.0
+e 0.0->2.0 w=0
+
+# neuron 0 in paper
+# TODO: to make sure we update the neuron every timestep, set a small
+#  negative bias. This is a bit of a hack. I should fix force_update to
+#  mean what it says
+n 1.0 bias=0.0 log_spikes=1 log_v=1 force_update=1 connections_out=1
+e 1.0->2.0 w=1.0
+
+# neuron 1 in paper
+n 2.0 bias=0.0 force_update=1 connections_out=1
+e 2.0->1.0 w=-100.0
+
+& 0.0@0.0
+& 1.0@0.0
+& 2.0@0.0

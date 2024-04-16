@@ -33,12 +33,12 @@ using namespace std;
 //  support a range of architectures seamlessly. At the moment, a large amount
 //  of memory is needed if we want to support lots of large cores
 // TrueNorth
-//#define ARCH_MAX_TILES 4096
-//#define ARCH_MAX_CORES_PER_TILE 1
+#define ARCH_MAX_TILES 4096
+#define ARCH_MAX_CORES_PER_TILE 1
 // Loihi
-#define ARCH_MAX_TILES 256
-//#define ARCH_MAX_TILES 32
-#define ARCH_MAX_CORES_PER_TILE 4
+// #define ARCH_MAX_TILES 256
+// //#define ARCH_MAX_TILES 32
+// #define ARCH_MAX_CORES_PER_TILE 4
 #define ARCH_MAX_UNITS 3
 #define ARCH_MAX_CORES (ARCH_MAX_TILES * ARCH_MAX_CORES_PER_TILE)
 
