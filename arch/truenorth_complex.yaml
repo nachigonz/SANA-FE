@@ -1,0 +1,45 @@
+# TrueNorth architecture
+architecture:
+  name: truenorth_chip
+  attributes:
+    topology: mesh
+    dimensions: 2
+    width: 64
+    height: 64
+
+  tile:
+    - name: truenorth_tile[0..4095]
+      attributes:
+        blocking: False
+      core:
+        - name: truenorth_core
+          attributes:
+            blocking: False
+          axon_in:
+            - name: core_in
+              # axon_in acts like input ports to the arch or subtree.
+              #  For Loihi we have at most 4096 slots to route packets to
+              #  different cores.
+              attributes:
+                fan_in: 256
+                protocol: dest_axon
+          soma:
+            - name: TN_lif
+              attributes:
+                type: digital
+                model: truenorth
+          synapse:
+            - name: core_synapses
+              attributes:
+                model: current_based
+                weight_bits: 8
+          dendrite:
+          - name: core_dendrites
+            attributes:
+
+          axon_out:
+            - name: core_out
+              attributes:
+                fan_out: 1
+                protocol: dest_axon
+

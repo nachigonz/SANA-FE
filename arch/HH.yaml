@@ -1,0 +1,50 @@
+## HH model yaml
+architecture:
+  name: HH_chip
+  attributes:
+    topology: mesh
+    width: 8
+    height: 4
+
+  tile:
+    - name: HH_tile[0..31]
+      attributes:
+        blocking: True
+      core:
+        - name: HH_core[0..3]
+          attributes:
+            blocking: True
+          axon_in:
+            - name: loihi_in
+              attributes:
+                energy_message: 0.0e-12
+                latency_message: 20.0e-9
+          soma:
+            - name: HH
+              attributes:
+                model: leaky_integrate_fire
+          synapse:
+            - name: loihi_dense_synapse  # Use the name to link
+              attributes:
+                model: current_based
+                energy_spike: 35.5e-12
+                latency_spike: 4.0e-9
+            - name: loihi_sparse_synapse
+              attributes:
+                model: current_based
+                energy_spike: 33.6e-12
+                latency_spike: 4.7e-9
+            - name: loihi_conv_synapse
+              attributes:
+                model: current_based
+                energy_spike: 24.0e-12
+                latency_spike: 3.1e-9
+          dendrite:
+          - name: loihi_dendrites
+            attributes:
+
+          axon_out:
+            - name: loihi_out
+              attributes:
+                energy: 111.0e-12
+                latency: 5.1e-9
