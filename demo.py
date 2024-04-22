@@ -6,6 +6,9 @@ from PIL import Image, ImageTk
 import customtkinter
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from tkinter import filedialog
+import pickle
+import matplotlib.pyplot as plt
+from tensorflow.keras import layers, models, utils
 
 #IMG PROCESSING
 import cv2
@@ -24,6 +27,20 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 hm_plotter = HMPlotter(name="Tile Spike Heatmap",width=8,height=4)
+
+np.set_printoptions(threshold=np.inf)
+def dvs_gesture_loader(path):
+    A = list()
+    B = list()
+    
+    with open(path,'rb') as pickle_file:  
+        A,B = pickle.load(pickle_file)
+
+    return A, B
+
+(x_train,y_train),(x_test,y_test) = dvs_gesture_loader('dvs_gesture32x32_1chNoPol100ms.pickle')
+model = models.load_model('dvs_gesture.h5', compile=False)
+gestures = ["clap", "rwave", "lwave", "rcw", "rccw", "lcw", "lccw", "roll", "drums", "guitar", "other"]
 
 class SANAFEApp(TkinterDnD.Tk):
 
@@ -109,10 +126,6 @@ class SANAFEApp(TkinterDnD.Tk):
         self.canvas.image = self.img
 
         ##### FILE INPUTS #####
-        # self.arch_input = tk.Listbox(self.home_frame)
-        # self.arch_input.insert(1, "drag arch file here")
-        # self.arch_input.drop_target_register(DND_FILES)
-        # self.arch_input.dnd_bind('<<Drop>>', self.drop_arch)
         self.arch_label = Label(self.home_frame, 
                             text = "Architecture File",
                             width = 50, height = 4, 
@@ -123,10 +136,7 @@ class SANAFEApp(TkinterDnD.Tk):
         self.arch_input.configure(text = "UPLOAD ARCH")
         self.arch_input.grid(pady = 3, row=2, column=2)
         self.arch_input.grid(row=4, column=0, columnspan=1, pady=20,padx=20, sticky="e")
-        # self.snn_input = tk.Listbox(self.home_frame)
-        # self.snn_input.insert(1, "drag snn file here")
-        # self.snn_input.drop_target_register(DND_FILES)
-        # self.snn_input.dnd_bind('<<Drop>>', self.drop_snn)
+
         self.snn_label = Label(self.home_frame, 
                             text = "SNN File",
                             width = 50, height = 4, 
@@ -171,6 +181,7 @@ class SANAFEApp(TkinterDnD.Tk):
             frame = cv2.resize(frame, (640, 640))
 
             self.prev_frame = frame.copy()
+            self.frame_counter = 0
 
             diff = cv2.absdiff(frame, self.prev_frame)
             threshold = 30
@@ -183,12 +194,33 @@ class SANAFEApp(TkinterDnD.Tk):
         self.home_button()
 
         architecture = "arch/loihi.yaml" #self.arch_input.get(0)
-        snn = "snn/dvs_gesture_32x32.net" #self.snn_input.get(0)
+        snn = "snn/dvs_gesture_apr20.net" #self.snn_input.get(0)
         spikes = False
         voltages = False
         self.sanafe_demo = sim.run_from_gui(architecture, snn,
             spike_trace=spikes, potential_trace=voltages)
         print("initialized demo simulator")
+
+        for y in range(32):
+            for x in range(32):
+                f = (32*y) + x
+                bias = x_test[1][y][x]
+                p = "bias=" + str(bias)
+                self.sanafe_demo.update_neuron(0, f, [p], 1)
+        
+        for _ in range(128):
+            outputs = []
+            self.sanafe_demo.run_timesteps(1)
+            res = self.sanafe_demo.get_status(5)
+            # print(_, end=':')
+            # print(res)
+            for i in range(len(res)):
+                if(res[i] == 2):
+                    print(_, end=':')
+                    print(res)
+                    outputs.append(i)
+            # print(outputs)
+            # print(self.sanafe_demo.run_summary())
 
         self.update()
 
@@ -200,7 +232,6 @@ class SANAFEApp(TkinterDnD.Tk):
                                                        ("all files",
                                                         "*.*")))
         self.arch_label.configure(text="File Opened: "+filename)
-        pass
 
     def upload_snn(self):
         filename = filedialog.askopenfilename(initialdir = "/",
@@ -210,7 +241,6 @@ class SANAFEApp(TkinterDnD.Tk):
                                                        ("all files",
                                                         "*.*")))
         self.snn_label.configure(text="File Opened: "+filename)
-        pass
 
     def init_button(self):
         architecture = "arch/loihi.yaml" #self.arch_input.get(0)
@@ -227,7 +257,6 @@ class SANAFEApp(TkinterDnD.Tk):
             spike_trace=spikes, potential_trace=voltages)
 
         print("initialized simulator")
-        pass
 
     def run_button(self):
         # hm_plotter.reset()
@@ -243,7 +272,6 @@ class SANAFEApp(TkinterDnD.Tk):
             print("run error")
         
        # p = HMPlotter(8,4)
-        pass
 
     def demo_button(self):
         if self.current is not None:
@@ -264,53 +292,35 @@ class SANAFEApp(TkinterDnD.Tk):
             self.current.pack(in_=self.view_panel, side=tk.TOP, fill=tk.BOTH, expand=True, padx=0, pady=0)
             
 
-    def drop_arch(self, event):
-        if event.data:
-            print('Dropped arch data:\n', event.data)
-            #print_event_info(event)
-            if event.widget == self.arch_input:
-                files = self.arch_input.tk.splitlist(event.data)
-                for f in files:
-                    if os.path.exists(f):
-                        print('Dropped file: "%s"' % f)
-                        self.arch_input.insert('end', f)
-                    else:
-                        print('Not dropping file "%s": file does not exist.' % f)
-            else:
-                print('Error: reported event.widget not known')
-        return event.action
-
-    def drop_snn(self, event):
-        if event.data:
-            print('Dropped ssn data:\n', event.data)
-            #print_event_info(event)
-            if event.widget == self.snn_input:
-                files = self.snn_input.tk.splitlist(event.data)
-                for f in files:
-                    if os.path.exists(f):
-                        print('Dropped file: "%s"' % f)
-                        self.snn_input.insert('end', f)
-                    else:
-                        print('Not dropping file "%s": file does not exist.' % f)
-            else:
-                print('Error: reported event.widget not known')
-        return event.action
-
     def consume_frames(self):
-        outputs = []
-        for frame in self.frame_list:
-            for f in range(len(frame)):
-                b = 0 
-                if frame[f] != 0:
-                    b = 1
-                    self.sanafe_demo.update_neuron(0, f, ["bias=10.0"], 1)
+        for i in range(len(self.frame_list)):
+            if(i!=0):
+                self.frame_list[0] += self.frame_list[i]
+                
+        gestures = ["clap", "rwave", "lwave", "rcw", "rccw", "lcw", "lccw", "roll", "drums", "guitar", "other"]
+        frame = self.frame_list[0]
+        max = np.amax(frame)
+        if(max != 0): frame = np.divide(frame, max)
+        frame = np.multiply(frame, 255)
+        # frame = frame[np.newaxis, ..., np.newaxis]
+        # predict = model.predict(frame)
+        # print(predict)
+        # for i in range(len(predict[0])):
+        #     if(predict[0][i] > .5): print(gestures[i])
+
+        for y in range(32):
+            for x in range(32):
+                f = (32*y) + x
+                bias = frame[y][x]
+                p = "bias=" + str(bias)
+                self.sanafe_demo.update_neuron(0, f, [p], 1)
+
+        for _ in range(250):
             self.sanafe_demo.run_timesteps(1)
-
             res = self.sanafe_demo.get_status(5)
-            for i in range(len(res)):
-                if(res[i] == 2): outputs.append(i)
+            print(res)
+            print(self.sanafe_demo.run_summary())
 
-        print(outputs)
         self.frame_list = []
 
     def update(self):
@@ -324,99 +334,31 @@ class SANAFEApp(TkinterDnD.Tk):
             self.video1_label.image = self.photo
 
             diff = cv2.absdiff(frame, self.prev_frame)
+
             threshold = 30
             _, thresholded = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
 
             start = time.time()
-            flattened = cv2.resize(thresholded, (32, 32))
-            #flattened = flattened.mean(axis=(1,3))
-            flattened = flattened.flatten()
-            # for f in range(len(flattened)):
-            #     b = 0 
-            #     if flattened[f] != 0: b = 1
-            #     self.sanafe_demo.update_neuron(0, f, ["input_spike=5.0"], 1)
+            resized = cv2.resize(thresholded, (32, 32))
+            flattened = resized.flatten()
 
-            self.frame_list.append(flattened)
-            if(len(self.frame_list) >= 50): self.consume_frames()
+            self.frame_list.append(resized)
+            if(len(self.frame_list) >= 100): self.consume_frames()
 
             end = time.time()
-            #self.sanafe_demo.run_timesteps(1)
-            #self.sanafe_demo.run_summary()
-            complete = time.time()
-            print("Send to Sim Time:")
-            print(end-start)
-            print("Total Timestep:")
-            print(complete-start)
+            #print("Send to Sim Time:")
+            #print(end-start)
             # print(self.sanafe_demo.get_status(5))
             # self.demo_label.configure(text = self.sanafe_demo.get_status(5))
 
-            self.photo2 = ImageTk.PhotoImage(image=Image.fromarray(thresholded))
+            self.photo2 = ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(resized, (640,640))))
             self.video2_label.config(image=self.photo2)
             self.video2_label.image = self.photo2
 
             self.prev_frame = frame.copy()
             
-        self.video1_label.after(100, self.update)
-
-MYHANDLER_SENDER = 'myhandler_sender'
-MYHANDLER_SIGNAL = 'myhandler_signal'
-TEST_FILE = 'spikes.csv'
-TEST_DIR = '/Documents/SANA-FE/'
-THRESHOLD_TIME = 0.01
-
-class FileUpdateHandler(FileSystemEventHandler):
-    ''' handle events from the spike file '''
-    def __init__(self, app):
-        self.app = app
-        self.start_time = time.time()
-
-    def on_modified(self, event):
-        now_time = time.time()
-        # filter out multiple modified events occuring for a single file operation
-        # if (now_time - self.start_time) < THRESHOLD_TIME:
-        #     print('repeated event, not triggering')
-        #     return
-        changed_file = ntpath.basename(event.src_path)
-        if changed_file == TEST_FILE:
-            print('changed file: {}'.format(changed_file))
-            print('event type: {}'.format(event.event_type))
-            with open(changed_file, 'r') as f:
-                lines = f.readlines()
-                last_line = ""
-                l = []
-                if len(lines)>1:
-                    last_line = lines[-1]
-                    l = list(map(int, last_line.split(',')))
-                    l = np.reshape(np.array(l), (4,8)) #TODO: generalize
-                    hm_plotter.add(l)
-                    hm_plotter.update_img()
-                elif len(lines)==1:
-                    last_line = lines[0]
-                    l = list(map(int, last_line.split(',')))
-                    l = np.reshape(np.array(l), (4,8)) #TODO: generalize
-                    hm_plotter.add(l)
-                    hm_plotter.update_img()
-                app.img = ImageTk.PhotoImage(Image.open("hm.png"))
-                app.canvas.config(image=app.img)
-                app.canvas.image = app.img
-                print(hm_plotter.state)
-            message = '{} changed'.format(changed_file)
-            dispatcher.send(message=message, signal=MYHANDLER_SIGNAL, sender=MYHANDLER_SENDER)
-        self.start_time = now_time
-
-def dispatcher_receive(message):
-    print('received dispatch: {}'.format(message))
-    # read in the altered file
+        self.video1_label.after(50, self.update) # 20 FPS
 
 if __name__ == "__main__":
     app = SANAFEApp()
-
-    #event_handler = FileUpdateHandler(app=app)
-    #dispatcher.connect(dispatcher_receive, signal=MYHANDLER_SIGNAL, sender=MYHANDLER_SENDER)
-    #observer = Observer()
-    #observer.schedule(event_handler, path=TEST_DIR, recursive=False)
-    #observer.start()
-
     app.mainloop()
-    
-    observer.stop()
