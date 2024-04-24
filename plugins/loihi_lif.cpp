@@ -129,6 +129,10 @@ class loihi_lif: public Base_Soma {
                     double res;
                     ret = sscanf(a->value_str, "%lf", &res);
                     bias += res;
+                }else if(strncmp("reset_potential", a->key, MAX_FIELD_LEN) == 0){
+                    potential = 0.0;
+                    current = 0.0;
+                    charge = 0.0;
                 }
                 if (ret < 1)
                 {

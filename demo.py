@@ -201,27 +201,46 @@ class SANAFEApp(TkinterDnD.Tk):
             spike_trace=spikes, potential_trace=voltages)
         print("initialized demo simulator")
 
-        for y in range(32):
-            for x in range(32):
-                f = (32*y) + x
-                bias = x_test[1][y][x]
-                p = "bias=" + str(bias)
-                self.sanafe_demo.update_neuron(0, f, [p], 1)
-        
-        for _ in range(128):
-            outputs = []
-            self.sanafe_demo.run_timesteps(1)
-            res = self.sanafe_demo.get_status(5)
-            # print(_, end=':')
-            # print(res)
-            for i in range(len(res)):
-                if(res[i] == 2):
-                    print(_, end=':')
-                    print(res)
-                    outputs.append(i)
-            # print(outputs)
-            # print(self.sanafe_demo.run_summary())
+        for test in range(10,20):
+            counter = 0
+            found = False
+            self.sanafe_demo.init()
+            project_dir = os.path.dirname(os.path.abspath(__file__))
+            run_dir=os.path.join(project_dir, "runs")
+            parsed_filename = os.path.join(run_dir,
+                                   os.path.basename(architecture) + ".parsed")
+            sim.parse_file(architecture, parsed_filename)
+            self.sanafe_demo.set_arch(parsed_filename)
+            self.sanafe_demo.set_net("snn/dvs_gesture_apr20.net")
+            for y in range(32):
+                for x in range(32):
+                    f = (32*y) + x
+                    bias = x_test[test][y][x]
+                    p = "bias=" + str(bias)
+                    self.sanafe_demo.update_neuron(0, f, ["reset_potential"], 1)
+                    self.sanafe_demo.update_neuron(0, f, [p], 1)
+            
+            for _ in range(128):
+                outputs = []
+                self.sanafe_demo.run_timesteps(1)
+                res = self.sanafe_demo.get_status(5)
+                # print(_, end=':')
+                # print(res)
+                for i in range(len(res)):
+                    if(res[i] == 2):
+                        print("5.", end="")
+                        print(i, end=", ")
+                        print(_)
+                        outputs.append(i)
 
+                        if(i == y_test[test] and not found):
+                            counter+=1
+                            found = True
+                # print(outputs)
+                # print(self.sanafe_demo.run_summary())
+            print(y_test[test])
+
+        print(counter)
         self.update()
 
     def upload_arch(self):
@@ -271,7 +290,7 @@ class SANAFEApp(TkinterDnD.Tk):
         else:
             print("run error")
         
-       # p = HMPlotter(8,4)
+        # p = HMPlotter(8,4)
 
     def demo_button(self):
         if self.current is not None:

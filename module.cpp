@@ -34,9 +34,15 @@ int SANA_FE::update_neuron(int group_id, int n_id, vector<string> kwargs, int co
 		string s = kwargs[i];
 		strcpy(&attr->key[i], s.substr(0, s.find('=')).c_str());
 		strcpy(&attr->value_str[i], s.substr(s.find('=')+1).c_str());
-		// INFO("neuron: %d.%d updated with key: %s and val: %s\n", group_id, n_id, &attr->key[i], &attr->value_str[i]);
+		INFO("neuron: %d.%d updated with key: %s and val: %s\n", group_id, n_id, &attr->key[i], &attr->value_str[i]);
 	}
 	net.groups[group_id].neurons[n_id].soma_class->parameters(attr, count);
+	net.groups[group_id].neurons[n_id].fired = 0;
+	net.groups[group_id].neurons[n_id].charge = 0;
+	net.groups[group_id].neurons[n_id].current = 0;
+	for(int i = 0; i < net.groups[group_id].neurons[n_id].connection_out_count; i++){
+		net.groups[group_id].neurons[n_id].connections_out[i].current = 0;
+	}
 	return 1;
 }
 void SANA_FE::run_timesteps(int timesteps){
