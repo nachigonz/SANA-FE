@@ -37,7 +37,7 @@ int network_parse_reset_mode(const char *str)
 }
 
 
-class loihi_lif: public Base_Soma {
+class leaky_integrate_fire: public Base_Soma {
 
     // LIF specific
     public:
@@ -48,7 +48,7 @@ class loihi_lif: public Base_Soma {
         // double dendritic_current_decay, processing_latency;
         int reset_mode, reverse_reset_mode;
 
-        loihi_lif(){
+        leaky_integrate_fire(){
             reset = 0.0;
             reverse_reset = 0.0;
             threshold = 1.0;
@@ -200,10 +200,10 @@ class loihi_lif: public Base_Soma {
 
 // the class factories
 
-extern "C" Base_Soma* create_loihi_lif() {
-    return new loihi_lif();
+extern "C" leaky_integrate_fire* create_leaky_integrate_fire() {
+    return new leaky_integrate_fire();
 }
 
-extern "C" void destroy_loihi_lif(Base_Soma* lif) {
+extern "C" void destroy_leaky_integrate_fire(leaky_integrate_fire* lif) {
     delete lif;
 }

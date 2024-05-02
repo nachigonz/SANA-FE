@@ -35,6 +35,7 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 	group->neuron_count = neuron_count;
 
 	group->default_soma_hw_name[0] = 0;
+	group->default_soma_model[0] = 0;
 	group->default_synapse_hw_name[0] = 0;
 	group->default_max_connections_out = 0;
 	group->default_log_potential = 0; // Disabled by default
@@ -58,6 +59,12 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		if (strncmp("soma_hw_name", a->key, MAX_FIELD_LEN) == 0)
 		{
 			strncpy(group->default_soma_hw_name, a->value_str,
+				MAX_FIELD_LEN);
+			ret = 1;
+		}
+		else if (strncmp("soma_model", a->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(group->default_soma_model, a->value_str,
 				MAX_FIELD_LEN);
 			ret = 1;
 		}
@@ -152,6 +159,8 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->connection_out_count = 0;
 		strncpy(n->soma_hw_name, group->default_soma_hw_name,
 			MAX_FIELD_LEN);
+		strncpy(n->soma_model, group->default_soma_model,
+			MAX_FIELD_LEN);
 
 		// Initialize neuron using group attributes
 		n->log_spikes = group->default_log_spikes;
@@ -179,7 +188,7 @@ int network_create_neuron_group(struct network *net, const int neuron_count,
 		n->is_init = 0;
 
 		// Create Soma Class Instance 
-		n->soma_class = get_soma(n->soma_hw_name);
+		n->soma_class = get_soma(n->soma_model);
 		n->soma_class->parameters(attr, attribute_count);
 	}
 
@@ -216,6 +225,12 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 		if (strncmp("name", a->key, MAX_FIELD_LEN) == 0)
 		{
 			strncpy(n->soma_hw_name, a->value_str, MAX_FIELD_LEN);
+		}
+		else if (strncmp("soma_model", a->key, MAX_FIELD_LEN) == 0)
+		{
+			strncpy(n->soma_model, a->value_str,
+				MAX_FIELD_LEN);
+			ret = 1;
 		}
 		else if (strncmp("connections_out", a->key, MAX_FIELD_LEN) == 0)
 		{
@@ -287,13 +302,13 @@ int network_create_neuron(struct neuron *const n, struct attributes *attr,
 
 	// Check if need to create Soma Class instance
 	if (n->soma_class == nullptr){
-		n->soma_class = get_soma(n->soma_hw_name);
-		INFO("Creating new neuron %d\n", n->id);
+		n->soma_class = get_soma(n->soma_model);
+		// INFO("Creating new neuron %d with model: %s\n", n->id, n->soma_model);
 	}
 	n->soma_class->parameters(attr, attribute_count);
 
-	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s\n",
-		n->group->id, n->id, n->force_update, n->soma_hw_name);
+	TRACE1("Created neuron: gid:%d nid:%d force:%d soma:%s model:%s\n",
+		n->group->id, n->id, n->force_update, n->soma_hw_name, n->soma_model);
 	n->is_init = 1;
 	return n->id;
 }

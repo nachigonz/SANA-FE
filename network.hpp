@@ -56,6 +56,7 @@ struct neuron
 	class Base_Soma *soma_class;
 
 	char soma_hw_name[MAX_FIELD_LEN];
+	char soma_model[MAX_FIELD_LEN];
 
 	// Track the timestep each hardware unit was last updated
 	int id, is_init, fired, connection_out_count;
@@ -104,6 +105,7 @@ struct neuron_group
 	//  hardware i.e. the same core and processor blocks in the core
 	struct neuron *neurons;
 	char default_soma_hw_name[MAX_FIELD_LEN];
+	char default_soma_model[MAX_FIELD_LEN];
 	char default_synapse_hw_name[MAX_FIELD_LEN];
 	int id, neuron_count;
 	int default_log_potential, default_log_spikes;

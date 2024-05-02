@@ -71,8 +71,8 @@ followed by one required field and then any number of named attributes.
 Fields are separated by one or more spaces.
 
 Attributes are defined using the syntax: `<attribute>=<value>`. Note, there
-is no space before or after the equals. The attribute `soma_hw_name` is required
-to be set for every neuron or neuron group.
+is no space before or after the equals. The attribute `soma_hw_name` and
+`soma_model` is required to be set for every neuron or neuron group.
 
 A neuron group is some population of neurons. The group defines any common
 parameters e.g., for a layer of a deep SNN.
@@ -171,9 +171,9 @@ folder along with their corresponding .cpp file.
 
 To specify the soma plugin, several steps need to be taken:
 1. The plugin name needs to be specified in the
-architecture yaml file under `soma: -name:`
+architecture yaml file under `soma: -attributes: -model: [plugin name]`
 2. The plugin name is set in the net file with the keyword
-`soma_hw_name`.
+`soma_model=[plugin name]`.
 3. The `/plugins` file contains the plugin compiled into a file with the
 format `[plugin name].so`.
 
